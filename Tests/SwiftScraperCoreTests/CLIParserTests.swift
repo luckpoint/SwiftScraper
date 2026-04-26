@@ -1,0 +1,417 @@
+import Foundation
+import XCTest
+@testable import SwiftScraperCore
+
+final class CLIParserTests: XCTestCase {
+    func testMinimalInvocationParsesDefaults() throws {
+        let command = try CLIParser.parse(arguments: ["https://example.com"])
+
+        guard case .run(let configuration) = command else {
+            return XCTFail("run configuration expected")
+        }
+
+        XCTAssertEqual(configuration.url.absoluteString, "https://example.com")
+        XCTAssertEqual(configuration.visibility, .windowless)
+        XCTAssertEqual(configuration.dataStoreMode, .ephemeral)
+        XCTAssertEqual(configuration.viewport, .default)
+        XCTAssertEqual(configuration.wait, .default)
+        XCTAssertEqual(configuration.timeouts, .default)
+        XCTAssertEqual(configuration.output, .stdout)
+        XCTAssertEqual(configuration.outputFormat, .plain)
+        XCTAssertEqual(configuration.extraction, .outerHTML)
+        XCTAssertNil(configuration.batch)
+        XCTAssertFalse(configuration.prettyPrint)
+        XCTAssertFalse(configuration.verbose)
+        XCTAssertEqual(configuration.wait.domStableDelay, 0.5)
+    }
+
+    func testLeadingSwiftRunSeparatorIsIgnored() throws {
+        let command = try CLIParser.parse(arguments: [
+            "--",
+            "https://example.com",
+            "--output", "out/output.html",
+            "--pretty-print",
+            "--verbose",
+        ])
+
+        guard case .run(let configuration) = command else {
+            return XCTFail("run configuration expected")
+        }
+
+        XCTAssertEqual(configuration.url.absoluteString, "https://example.com")
+        XCTAssertTrue(configuration.prettyPrint)
+        XCTAssertTrue(configuration.verbose)
+
+        guard case .file(let outputURL) = configuration.output else {
+            return XCTFail("file output expected")
+        }
+
+        XCTAssertTrue(outputURL.path.hasSuffix("/out/output.html"))
+    }
+
+    func testCookieAndWaitOptionsParse() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/app",
+            "--cookie", "name=session;value=abc;domain=example.com;path=/app;secure=true;httpOnly=true",
+            "--wait-delay", "1.5",
+            "--wait-selector", "#ready",
+            "--wait-text", "Complete",
+            "--poll-interval", "0.25",
+            "--dom-stable-delay", "1.25",
+            "--load-timeout", "12",
+            "--wait-timeout", "33",
+            "--js-timeout", "8",
+            "--visibility", "hidden-window",
+            "--viewport", "1280x720",
+            "--output", "tmp/result.html",
+            "--selector-inner-html", "#app",
+            "--pretty-print",
+            "--persistent-store",
+            "--verbose",
+        ])
+
+        guard case .run(let configuration) = command else {
+            return XCTFail("run configuration expected")
+        }
+
+        XCTAssertEqual(configuration.visibility, .hiddenWindow)
+        XCTAssertEqual(configuration.viewport, Viewport(width: 1280, height: 720))
+        XCTAssertEqual(configuration.wait.fixedDelay, 1.5)
+        XCTAssertEqual(configuration.wait.selectorConditions, ["#ready"])
+        XCTAssertEqual(configuration.wait.textConditions, ["Complete"])
+        XCTAssertEqual(configuration.wait.pollInterval, 0.25)
+        XCTAssertEqual(configuration.wait.domStableDelay, 1.25)
+        XCTAssertEqual(configuration.timeouts.load, 12)
+        XCTAssertEqual(configuration.timeouts.render, 33)
+        XCTAssertEqual(configuration.timeouts.javaScript, 8)
+        XCTAssertEqual(configuration.dataStoreMode, .persistent)
+        XCTAssertEqual(configuration.extraction, .selectorInnerHTML("#app"))
+        XCTAssertTrue(configuration.prettyPrint)
+        XCTAssertTrue(configuration.verbose)
+
+        guard case .file(let outputURL) = configuration.output else {
+            return XCTFail("file output expected")
+        }
+
+        XCTAssertTrue(outputURL.path.hasSuffix("/tmp/result.html"))
+
+        XCTAssertEqual(configuration.cookies.count, 1)
+        XCTAssertEqual(
+            configuration.cookies[0],
+            CookieDefinition(
+                name: "session",
+                value: "abc",
+                domain: "example.com",
+                path: "/app",
+                secure: true,
+                httpOnly: true
+            )
+        )
+    }
+
+    func testCookieFileLoadsSingleObject() throws {
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("json")
+
+        defer {
+            try? FileManager.default.removeItem(at: tempURL)
+        }
+
+        let json = """
+        {
+          "name": "session",
+          "value": "xyz",
+          "domain": "example.com",
+          "path": "/",
+          "secure": true,
+          "httpOnly": false
+        }
+        """
+
+        try json.write(to: tempURL, atomically: true, encoding: .utf8)
+
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com",
+            "--cookie-file", tempURL.path,
+        ])
+
+        guard case .run(let configuration) = command else {
+            return XCTFail("run configuration expected")
+        }
+
+        XCTAssertEqual(configuration.cookies.count, 1)
+        XCTAssertEqual(configuration.cookies[0].name, "session")
+        XCTAssertEqual(configuration.cookies[0].value, "xyz")
+        XCTAssertEqual(configuration.cookies[0].domain, "example.com")
+        XCTAssertTrue(configuration.cookies[0].secure)
+    }
+
+    func testAutoScrollOptionParses() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/article",
+            "--auto-scroll",
+        ])
+
+        guard case .run(let configuration) = command else {
+            return XCTFail("run configuration expected")
+        }
+
+        XCTAssertTrue(configuration.wait.autoScrollEnabled)
+    }
+
+    func testContentOnlyOptionParses() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/article",
+            "--content-only",
+            "--pretty-print",
+        ])
+
+        guard case .run(let configuration) = command else {
+            return XCTFail("run configuration expected")
+        }
+
+        XCTAssertEqual(configuration.extraction, .contentOnly)
+        XCTAssertTrue(configuration.prettyPrint)
+    }
+
+    func testMarkdownOptionParses() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/article",
+            "--content-only",
+            "--markdown",
+        ])
+
+        guard case .run(let configuration) = command else {
+            return XCTFail("run configuration expected")
+        }
+
+        XCTAssertEqual(configuration.extraction, .contentOnly)
+        XCTAssertEqual(configuration.outputFormat, .markdown)
+    }
+
+    func testInspectStructureOptionParses() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/article",
+            "--inspect-structure",
+        ])
+
+        guard case .run(let configuration) = command else {
+            return XCTFail("run configuration expected")
+        }
+
+        XCTAssertEqual(configuration.extraction, .structureInspection)
+    }
+
+    func testSitemapOptionsParse() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/docs/article",
+            "--sitemap",
+            "--concurrency", "8",
+            "--content-only",
+        ])
+
+        guard case .run(let configuration) = command else {
+            return XCTFail("run configuration expected")
+        }
+
+        XCTAssertEqual(configuration.url.absoluteString, "https://example.com/docs/article")
+        XCTAssertEqual(configuration.batch, BatchMode(input: .sitemap, concurrency: 8))
+        XCTAssertEqual(configuration.extraction, .contentOnly)
+    }
+
+    func testURLFileOptionsParse() throws {
+        let command = try CLIParser.parse(arguments: [
+            "--url-file", "tmp/urls.txt",
+            "--concurrency", "3",
+            "--inspect-structure",
+        ])
+
+        guard case .run(let configuration) = command else {
+            return XCTFail("run configuration expected")
+        }
+
+        XCTAssertEqual(configuration.url.path, URL(fileURLWithPath: "tmp/urls.txt", relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)).standardizedFileURL.path)
+        XCTAssertEqual(
+            configuration.batch,
+            BatchMode(
+                input: .urlFile(URL(fileURLWithPath: "tmp/urls.txt", relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)).standardizedFileURL),
+                concurrency: 3
+            )
+        )
+        XCTAssertEqual(configuration.extraction, .structureInspection)
+    }
+
+    func testConcurrencyWithoutBatchInputFails() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--concurrency", "4",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--concurrency` は `--sitemap` または `--url-file` と一緒に指定してください")
+            )
+        }
+    }
+
+    func testConcurrencyMustBePositive() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--sitemap",
+                "--concurrency", "0",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("--concurrency は 1 以上で指定してください")
+            )
+        }
+    }
+
+    func testLegacySitemapConcurrencyAliasStillWorks() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/docs/article",
+            "--sitemap",
+            "--sitemap-concurrency", "2",
+        ])
+
+        guard case .run(let configuration) = command else {
+            return XCTFail("run configuration expected")
+        }
+
+        XCTAssertEqual(configuration.batch, BatchMode(input: .sitemap, concurrency: 2))
+    }
+
+    func testURLFileCannotBeCombinedWithURL() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--url-file", "tmp/urls.txt",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--url-file` を使う場合は URL を同時に指定できません")
+            )
+        }
+    }
+
+    func testMultipleExtractionModesFail() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--body-text",
+                "--content-only",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument(
+                    "抽出モードは `--body-text` / `--selector-inner-html` / `--content-only` / `--inspect-structure` のうち 1 つだけ指定できます"
+                )
+            )
+        }
+    }
+
+    func testMarkdownCannotBeCombinedWithPrettyPrint() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--markdown",
+                "--pretty-print",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--markdown` と `--pretty-print` は同時に指定できません")
+            )
+        }
+    }
+
+    func testMarkdownRequiresHTMLExtractionMode() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--body-text",
+                "--markdown",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--markdown` は HTML を返す抽出モードでだけ指定できます")
+            )
+        }
+    }
+
+    func testUnknownOptionFails() {
+        XCTAssertThrowsError(try CLIParser.parse(arguments: ["https://example.com", "--wat"])) { error in
+            XCTAssertEqual(error as? ScraperError, .unknownOption("--wat"))
+        }
+    }
+}
+
+final class ExtractionScriptTests: XCTestCase {
+    func testAutoScrollScriptBuildsScrollProbe() {
+        let script = WebScraper.makeAutoScrollScriptForTesting()
+
+        XCTAssertTrue(script.contains("document.scrollingElement"))
+        XCTAssertTrue(script.contains("window.scrollTo(0, nextTop)"))
+        XCTAssertTrue(script.contains("clientHeight"))
+        XCTAssertTrue(script.contains("reachedBottom"))
+        XCTAssertTrue(script.contains("JSON.stringify"))
+    }
+
+    func testOuterHTMLExtractionRemovesScriptTags() {
+        let script = WebScraper.makeExtractionScriptForTesting(.outerHTML)
+
+        XCTAssertTrue(script.contains("cloneNode(true)"))
+        XCTAssertTrue(script.contains("querySelectorAll('script, noscript')"))
+        XCTAssertTrue(script.contains("querySelectorAll('iframe')"))
+        XCTAssertTrue(script.contains("iframe.hidden"))
+        XCTAssertTrue(script.contains("style.display === 'none'"))
+        XCTAssertTrue(script.contains("rect.width === 0 || rect.height === 0"))
+        XCTAssertTrue(script.contains("return clone.outerHTML"))
+    }
+
+    func testSelectorInnerHTMLExtractionRemovesNestedScriptTags() {
+        let script = WebScraper.makeExtractionScriptForTesting(.selectorInnerHTML("#app"))
+
+        XCTAssertTrue(script.contains("document.querySelector"))
+        XCTAssertTrue(script.contains("['script', 'noscript'].includes"))
+        XCTAssertTrue(script.contains("querySelectorAll('script, noscript')"))
+        XCTAssertTrue(script.contains("element.tagName.toLowerCase() === 'iframe'"))
+        XCTAssertTrue(script.contains("querySelectorAll('iframe')"))
+        XCTAssertTrue(script.contains("style.visibility === 'hidden'"))
+        XCTAssertTrue(script.contains("return clone.innerHTML"))
+    }
+
+    func testBodyTextExtractionDoesNotNeedSanitizer() {
+        let script = WebScraper.makeExtractionScriptForTesting(.bodyText)
+
+        XCTAssertEqual(script, "document.body ? document.body.innerText : ''")
+    }
+
+    func testContentOnlyExtractionBuildsContentCandidateScript() {
+        let script = WebScraper.makeExtractionScriptForTesting(.contentOnly)
+
+        XCTAssertTrue(script.contains("const selectors = ["))
+        XCTAssertTrue(script.contains("'main'"))
+        XCTAssertTrue(script.contains("'article'"))
+        XCTAssertTrue(script.contains("sidebarLike"))
+        XCTAssertTrue(script.contains("describeNode"))
+        XCTAssertTrue(script.contains("return analysis.clone ? analysis.clone.outerHTML : ''"))
+    }
+
+    func testStructureInspectionExtractionBuildsReportScript() {
+        let script = WebScraper.makeExtractionScriptForTesting(.structureInspection)
+
+        XCTAssertTrue(script.contains("JSON.stringify"))
+        XCTAssertTrue(script.contains("contentOnlyRemoval"))
+        XCTAssertTrue(script.contains("candidateTextLength"))
+        XCTAssertTrue(script.contains("querySelectorAll('header, [role=\"banner\"]')"))
+        XCTAssertTrue(script.contains("querySelectorAll('main, [role=\"main\"]')"))
+    }
+}
