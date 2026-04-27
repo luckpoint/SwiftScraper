@@ -27,6 +27,11 @@ public enum CLIParser {
         var output: OutputDestination = .stdout
         var outputFormat: OutputFormat = .plain
         var extraction: ExtractionMode = .outerHTML
+        var imageExtractionEnabled = false
+        var imageFilter: ImageFilterMode = .all
+        var imageScoreThreshold = ImageExtractionConfiguration.disabled.scoreThreshold
+        var imageIncludeMaybe = false
+        var imageDebug = false
         var extractionFlagCount = 0
         var prettyPrint = false
         var verbose = false
@@ -111,6 +116,27 @@ public enum CLIParser {
                 output = .file(resolvePath(raw))
             case "--markdown":
                 outputFormat = .markdown
+            case "--extract-images":
+                imageExtractionEnabled = true
+            case "--image-filter":
+                imageExtractionEnabled = true
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                guard let parsed = ImageFilterMode(rawValue: raw) else {
+                    throw ScraperError.invalidArgument(
+                        "--image-filter は \(ImageFilterMode.allCases.map(\.rawValue).joined(separator: ", ")) のいずれかを指定してください"
+                    )
+                }
+                imageFilter = parsed
+            case "--image-score-threshold":
+                imageExtractionEnabled = true
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                imageScoreThreshold = try parseUnitDouble(raw, option: argument)
+            case "--image-include-maybe":
+                imageExtractionEnabled = true
+                imageIncludeMaybe = true
+            case "--image-debug":
+                imageExtractionEnabled = true
+                imageDebug = true
             case "--body-text":
                 extractionFlagCount += 1
                 extraction = .bodyText
@@ -155,6 +181,10 @@ public enum CLIParser {
             throw ScraperError.invalidArgument("`--markdown` は HTML を返す抽出モードでだけ指定できます")
         }
 
+        if imageExtractionEnabled && !supportsImageExtraction(extraction) {
+            throw ScraperError.invalidArgument("`--extract-images` は HTML を返す抽出モードでだけ指定できます")
+        }
+
         if concurrencySpecified && batchInput == nil {
             throw ScraperError.invalidArgument("`--concurrency` は `--sitemap` または `--url-file` と一緒に指定してください")
         }
@@ -194,6 +224,13 @@ public enum CLIParser {
         )
 
         let batch = batchInput.map { BatchMode(input: $0, concurrency: concurrency) }
+        let imageExtraction = ImageExtractionConfiguration(
+            enabled: imageExtractionEnabled,
+            filter: imageFilter,
+            scoreThreshold: imageScoreThreshold,
+            includeMaybe: imageIncludeMaybe,
+            debug: imageDebug
+        )
 
         return .run(
             ScraperConfiguration(
@@ -208,6 +245,7 @@ public enum CLIParser {
                 output: output,
                 outputFormat: outputFormat,
                 extraction: extraction,
+                imageExtraction: imageExtraction,
                 prettyPrint: prettyPrint,
                 verbose: verbose
             )
@@ -253,6 +291,11 @@ public enum CLIParser {
       --content-only                 ヘッダ・フッタ・サイドバー等を除いた本文候補の HTML を抽出
       --inspect-structure            ページ構成と本文候補だけを確認し、HTML はダンプしない
       --markdown                     HTML 系抽出結果を Markdown に変換して出力
+      --extract-images               画像 heuristic を適用して HTML 系出力の画像を絞り込む
+      --image-filter <mode>          all | article-only
+      --image-score-threshold <0-1>  keep 判定の閾値。既定 0.65
+      --image-include-maybe          maybe 判定の画像も出力に残す
+      --image-debug                  画像スコアと理由を stderr に JSON で出す
       --pretty-print                 HTML 系の出力を SwiftSoup で整形
       --verbose                      stderr に進行ログを出す
       --help                         ヘルプを表示
@@ -329,6 +372,10 @@ public enum CLIParser {
         }
     }
 
+    private static func supportsImageExtraction(_ extraction: ExtractionMode) -> Bool {
+        supportsMarkdown(extraction)
+    }
+
     private static func parseURL(_ raw: String) throws -> URL {
         guard let url = URL(string: raw), let scheme = url.scheme, !scheme.isEmpty else {
             throw ScraperError.invalidURL(raw)
@@ -395,6 +442,18 @@ public enum CLIParser {
             guard value > 0 else {
                 throw ScraperError.invalidArgument("\(option) は 0 より大きい値で指定してください")
             }
+        }
+
+        return value
+    }
+
+    private static func parseUnitDouble(_ raw: String, option: String) throws -> Double {
+        guard let value = Double(raw), value.isFinite else {
+            throw ScraperError.invalidArgument("\(option) は数値で指定してください")
+        }
+
+        guard (0...1).contains(value) else {
+            throw ScraperError.invalidArgument("\(option) は 0.0 以上 1.0 以下で指定してください")
         }
 
         return value

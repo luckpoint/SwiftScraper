@@ -9,6 +9,7 @@ macOS 標準の `WKWebView` を使って、JavaScript 実行後のページ内�
 - 固定待機、自動スクロール、セレクタ待機、テキスト待機、DOM 安定待機を組み合わせ可能
 - HTML 全体、`body` テキスト、特定要素、本文候補、構造確認レポートを抽出可能
 - HTML の pretty print と Markdown 変換に対応
+- 画像候補の特徴量を JS で集め、Swift の heuristic でロゴや UI 画像を落とせる
 - `sitemap.xml` または URL ファイルから複数ページを batch 実行可能
 - `windowless` / `hidden-window` / `visible-window` で露出度を切り替え可能
 
@@ -66,6 +67,11 @@ swift run swift-scraper -- https://example.com
 --content-only                 本文候補の HTML を抽出
 --inspect-structure            本文候補とランドマーク情報だけを確認
 --markdown                     HTML 系抽出結果を Markdown に変換
+--extract-images               画像 heuristic を適用して HTML 系出力の画像を絞り込む
+--image-filter <mode>          all | article-only
+--image-score-threshold <0-1>  keep 判定の閾値。既定 0.65
+--image-include-maybe          maybe 判定の画像も出力に残す
+--image-debug                  画像スコアと理由を stderr に JSON で出す
 --pretty-print                 HTML 系出力を整形
 --verbose                      stderr に進行ログを出す
 --sitemap                      sitemap.xml をたどって batch 実行
@@ -99,14 +105,27 @@ swift run swift-scraper -- \
   --dom-stable-delay 1.0
 ```
 
-### 4. Cookie を直接注入する
+### 4. 本文画像だけを残す
+```bash
+swift run swift-scraper -- \
+  https://example.com/article \
+  --content-only \
+  --markdown \
+  --extract-images \
+  --image-filter article-only \
+  --image-debug
+```
+
+`--extract-images` を付けると、HTML / Markdown 化の前に画像 heuristic を適用し、`drop` 判定の画像を出力から除去します。`--image-debug` はスコアと理由を stderr へ JSON で出します。
+
+### 5. Cookie を直接注入する
 ```bash
 swift run swift-scraper -- \
   https://example.com/dashboard \
   --cookie 'name=session;value=abc123;domain=example.com;path=/;secure=true;httpOnly=true'
 ```
 
-### 5. Cookie JSON を使う
+### 6. Cookie JSON を使う
 ```json
 [
   {
@@ -126,7 +145,7 @@ swift run swift-scraper -- \
   --cookie-file cookies.json
 ```
 
-### 6. sitemap から batch 実行する
+### 7. sitemap から batch 実行する
 ```bash
 swift run swift-scraper -- \
   https://example.com \
@@ -137,7 +156,7 @@ swift run swift-scraper -- \
   --output out/sitemap-batch.json
 ```
 
-### 7. URL ファイルから batch 実行する
+### 8. URL ファイルから batch 実行する
 `urls.txt`:
 
 ```text
@@ -166,6 +185,7 @@ swift run swift-scraper -- \
 
 制約:
 - `--markdown` は HTML を返す抽出モードでだけ使えます
+- `--extract-images` は HTML を返す抽出モードでだけ使えます
 - `--markdown` と `--pretty-print` は同時指定できません
 - `--selector-inner-html` は対象要素が見つからないとエラーになります
 - `--auto-scroll` は文書全体のスクロールにだけ効き、内部スクロールコンテナには別対応が必要な場合があります
@@ -213,8 +233,10 @@ batch 実行時の最終出力は JSON です。各ページの成功 / 失敗�
 - [06. 安定性とタイムアウト制御](docs/06-stability-and-timeout.md)
 - [07. デバッグ運用](docs/07-debug-operability.md)
 - [08. Batch 実行](docs/08-batch-processing.md)
+- [09. 画像抽出と heuristic](docs/09-image-extraction.md)
 
 ## 制約
 - macOS 専用です
 - gzip 圧縮された sitemap (`.xml.gz`) は URL 判定のみ対応で、中身の展開は未対応です
 - `windowless` / `hidden-window` は露出を抑えるためのモードで、完全 headless を保証するものではありません
+- 画像 heuristic の初期実装はページ単位判定までです。batch 頻度補正やドメイン別 blacklist は未実装です

@@ -19,8 +19,8 @@ public struct StderrLogger: Sendable {
         self.verbose = verbose
     }
 
-    public func info(_ message: String) {
-        guard verbose else {
+    public func info(_ message: String, force: Bool = false) {
+        guard verbose || force else {
             return
         }
 
@@ -29,6 +29,10 @@ public struct StderrLogger: Sendable {
 
     public func error(_ message: String) {
         write("error: \(message)")
+    }
+
+    public func raw(_ message: String) {
+        write(message)
     }
 
     private func write(_ message: String) {

@@ -19,6 +19,7 @@ final class CLIParserTests: XCTestCase {
         XCTAssertEqual(configuration.output, .stdout)
         XCTAssertEqual(configuration.outputFormat, .plain)
         XCTAssertEqual(configuration.extraction, .outerHTML)
+        XCTAssertEqual(configuration.imageExtraction, .disabled)
         XCTAssertNil(configuration.batch)
         XCTAssertFalse(configuration.prettyPrint)
         XCTAssertFalse(configuration.verbose)
@@ -190,6 +191,34 @@ final class CLIParserTests: XCTestCase {
         XCTAssertEqual(configuration.outputFormat, .markdown)
     }
 
+    func testImageExtractionOptionsParse() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/article",
+            "--content-only",
+            "--extract-images",
+            "--image-filter", "article-only",
+            "--image-score-threshold", "0.72",
+            "--image-include-maybe",
+            "--image-debug",
+        ])
+
+        guard case .run(let configuration) = command else {
+            return XCTFail("run configuration expected")
+        }
+
+        XCTAssertEqual(configuration.extraction, .contentOnly)
+        XCTAssertEqual(
+            configuration.imageExtraction,
+            ImageExtractionConfiguration(
+                enabled: true,
+                filter: .articleOnly,
+                scoreThreshold: 0.72,
+                includeMaybe: true,
+                debug: true
+            )
+        )
+    }
+
     func testInspectStructureOptionParses() throws {
         let command = try CLIParser.parse(arguments: [
             "https://example.com/article",
@@ -346,6 +375,36 @@ final class CLIParserTests: XCTestCase {
         }
     }
 
+    func testImageExtractionRequiresHTMLExtractionMode() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--body-text",
+                "--extract-images",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--extract-images` は HTML を返す抽出モードでだけ指定できます")
+            )
+        }
+    }
+
+    func testImageScoreThresholdMustBeWithinUnitInterval() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--extract-images",
+                "--image-score-threshold", "1.5",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("--image-score-threshold は 0.0 以上 1.0 以下で指定してください")
+            )
+        }
+    }
+
     func testUnknownOptionFails() {
         XCTAssertThrowsError(try CLIParser.parse(arguments: ["https://example.com", "--wat"])) { error in
             XCTAssertEqual(error as? ScraperError, .unknownOption("--wat"))
@@ -413,5 +472,16 @@ final class ExtractionScriptTests: XCTestCase {
         XCTAssertTrue(script.contains("candidateTextLength"))
         XCTAssertTrue(script.contains("querySelectorAll('header, [role=\"banner\"]')"))
         XCTAssertTrue(script.contains("querySelectorAll('main, [role=\"main\"]')"))
+    }
+
+    func testImageCandidateScriptBuildsCollectionProbe() {
+        let script = WebScraper.makeImageCandidateScriptForTesting()
+
+        XCTAssertTrue(script.contains("Array.from(document.images)"))
+        XCTAssertTrue(script.contains("img.currentSrc || img.src"))
+        XCTAssertTrue(script.contains("collectAncestors"))
+        XCTAssertTrue(script.contains("nearestTextBlockLength"))
+        XCTAssertTrue(script.contains("linkedToRoot"))
+        XCTAssertTrue(script.contains("JSON.stringify"))
     }
 }

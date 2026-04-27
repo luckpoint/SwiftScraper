@@ -160,11 +160,77 @@ final class WebScraperIntegrationTests: XCTestCase {
         try await allowWebKitToSettle()
     }
 
+    func testRunOuterHTMLFiltersDroppedImagesWhenImageExtractionEnabled() async throws {
+        prepareApplicationIfNeeded()
+
+        let html = """
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Image Fixture</title>
+          </head>
+          <body>
+            <header>
+              <a href="/">
+                <img
+                  class="site-logo"
+                  alt="Example"
+                  width="120"
+                  height="32"
+                  src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='32'><rect width='120' height='32' fill='black'/></svg>">
+              </a>
+            </header>
+            <main>
+              <article>
+                <figure>
+                  <img
+                    alt="Important product screenshot"
+                    width="800"
+                    height="450"
+                    src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450'><rect width='800' height='450' fill='orange'/></svg>">
+                  <figcaption>Architecture diagram</figcaption>
+                </figure>
+              </article>
+            </main>
+          </body>
+        </html>
+        """
+
+        let fileURL = try makeHTMLFixture(html)
+        let scraper = WebScraper(
+            configuration: makeConfiguration(
+                url: fileURL,
+                wait: WaitConfiguration(
+                    fixedDelay: 0,
+                    selectorConditions: [],
+                    textConditions: [],
+                    pollInterval: 0.05,
+                    domStableDelay: 0,
+                    autoScrollEnabled: false
+                ),
+                timeouts: Timeouts(load: 5, render: 1, javaScript: 1),
+                extraction: .outerHTML,
+                imageExtraction: ImageExtractionConfiguration(enabled: true)
+            ),
+            logger: StderrLogger(verbose: false)
+        )
+
+        let output = try await scraper.run()
+
+        XCTAssertTrue(output.contains("Important product screenshot"))
+        XCTAssertTrue(output.contains("Architecture diagram"))
+        XCTAssertFalse(output.contains("site-logo"))
+        XCTAssertFalse(output.contains("width='120' height='32'"))
+        try await allowWebKitToSettle()
+    }
+
     private func makeConfiguration(
         url: URL,
         wait: WaitConfiguration,
         timeouts: Timeouts,
         extraction: ExtractionMode,
+        imageExtraction: ImageExtractionConfiguration = .disabled,
         visibility: VisibilityMode = .windowless
     ) -> ScraperConfiguration {
         ScraperConfiguration(
@@ -178,6 +244,7 @@ final class WebScraperIntegrationTests: XCTestCase {
             output: .stdout,
             outputFormat: .plain,
             extraction: extraction,
+            imageExtraction: imageExtraction,
             prettyPrint: false,
             verbose: false
         )

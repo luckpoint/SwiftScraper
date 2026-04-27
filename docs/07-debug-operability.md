@@ -13,6 +13,7 @@
 - `--visibility hidden-window` / `windowless` で静かな運用へ切り替えられる
 - `--verbose` で進行ログを `stderr` に出せる
 - `--inspect-structure` で本文候補の選ばれ方を確認できる
+- `--image-debug` で画像 heuristic の `score` / `decision` / `reasons` を JSON で確認できる
 
 ## モード方針
 - 開発モード
@@ -29,6 +30,7 @@
 - 未到達セレクタ / テキスト
 - DOM 変化検知ログ
 - 取得 HTML の内容
+- 画像候補ごとのスコアと除外理由
 - 出力保存先
 - batch 実行時のページ単位成功 / 失敗
 
@@ -37,6 +39,7 @@
 
 ## 注意点
 - `--verbose` は標準出力ではなく標準エラーへ出るため、抽出結果の stdout と分離できる
+- `--image-debug` も標準エラーへ出るため、抽出本文の stdout を汚さない
 - `--inspect-structure` は本文推定の調整用途であり、抽出 HTML 自体は返さない
 - 本番寄りの隠蔽を優先しすぎると、原因調査が困難になる
 - 初期実装では開発モードを優先し、安定後に非表示運用を強める

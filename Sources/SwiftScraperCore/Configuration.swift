@@ -177,6 +177,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
     public let output: OutputDestination
     public let outputFormat: OutputFormat
     public let extraction: ExtractionMode
+    public let imageExtraction: ImageExtractionConfiguration
     public let prettyPrint: Bool
     public let verbose: Bool
 
@@ -192,6 +193,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
         output: OutputDestination,
         outputFormat: OutputFormat = .plain,
         extraction: ExtractionMode,
+        imageExtraction: ImageExtractionConfiguration = .disabled,
         prettyPrint: Bool,
         verbose: Bool
     ) {
@@ -206,6 +208,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
         self.output = output
         self.outputFormat = outputFormat
         self.extraction = extraction
+        self.imageExtraction = imageExtraction
         self.prettyPrint = prettyPrint
         self.verbose = verbose
     }
@@ -225,6 +228,7 @@ extension ScraperConfiguration {
             output: output,
             outputFormat: outputFormat,
             extraction: extraction,
+            imageExtraction: imageExtraction,
             prettyPrint: prettyPrint,
             verbose: verbose
         )

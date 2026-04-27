@@ -290,7 +290,7 @@ public final class WebScraper: NSObject {
                 return try StructureInspectionFormatter.render(json: stringValue)
             }
 
-            return stringValue
+            return try await applyImageExtractionIfNeeded(to: stringValue)
         case .null:
             if case .selectorInnerHTML(let selector) = configuration.extraction {
                 throw ScraperError.extractionFailed("セレクタに一致する要素が見つかりません: \(selector)")
@@ -300,6 +300,64 @@ public final class WebScraper: NSObject {
                 phase: phase,
                 expected: "String"
             )
+        }
+    }
+
+    private func applyImageExtractionIfNeeded(to output: String) async throws -> String {
+        guard configuration.imageExtraction.enabled else {
+            return output
+        }
+
+        guard supportsImageExtraction(configuration.extraction) else {
+            return output
+        }
+
+        logger.info("画像候補の収集を開始します")
+        let candidates = try await evaluateImageCandidates()
+        let evaluatedImages = ImageHeuristics.evaluate(candidates, configuration: configuration.imageExtraction)
+        let keptCount = evaluatedImages.filter { $0.shouldKeep(includeMaybe: configuration.imageExtraction.includeMaybe) }.count
+
+        if configuration.imageExtraction.debug {
+            let debugJSON = try ImageDebugFormatter.render(
+                pageURL: configuration.url,
+                evaluatedImages: evaluatedImages,
+                configuration: configuration.imageExtraction
+            )
+            logger.raw(debugJSON)
+        }
+
+        logger.info("画像候補を \(evaluatedImages.count) 件評価し、\(keptCount) 件を残します")
+        return try ImageContentFilter.filter(
+            output,
+            sourceURL: configuration.url,
+            extraction: configuration.extraction,
+            evaluatedImages: evaluatedImages,
+            configuration: configuration.imageExtraction
+        )
+    }
+
+    private func evaluateImageCandidates() async throws -> [ImageCandidate] {
+        let rawValue = try await evaluateJavaScript(Self.makeImageCandidateScript(), phase: "画像候補収集")
+        guard case .string(let json) = rawValue else {
+            throw ScraperError.unexpectedJavaScriptResult(
+                phase: "画像候補収集",
+                expected: "JSON String"
+            )
+        }
+
+        do {
+            return try JSONDecoder().decode([ImageCandidate].self, from: Data(json.utf8))
+        } catch {
+            throw ScraperError.javaScriptFailed("画像候補 JSON の解釈に失敗しました: \(error.localizedDescription)")
+        }
+    }
+
+    private func supportsImageExtraction(_ extraction: ExtractionMode) -> Bool {
+        switch extraction {
+        case .outerHTML, .selectorInnerHTML, .contentOnly:
+            return true
+        case .bodyText, .structureInspection:
+            return false
         }
     }
 
@@ -566,6 +624,10 @@ extension WebScraper {
         ExtractionScriptBuilder.makeScript(for: extraction)
     }
 
+    nonisolated static func makeImageCandidateScriptForTesting() -> String {
+        makeImageCandidateScript()
+    }
+
     nonisolated static func makeAutoScrollScriptForTesting() -> String {
         makeAutoScrollScript()
     }
@@ -608,6 +670,10 @@ extension WebScraper {
           });
         })()
         """
+    }
+
+    nonisolated private static func makeImageCandidateScript() -> String {
+        ImageCandidateScriptBuilder.makeScript()
     }
 }
 
@@ -989,6 +1055,122 @@ private enum ExtractionScriptBuilder {
           const classes = Array.from(node.classList || []).slice(0, 3).map(name => `.${name}`).join('');
           return `${tag}${id}${classes}`;
         }
+        """#
+    }
+}
+
+private enum ImageCandidateScriptBuilder {
+    static func makeScript() -> String {
+        #"""
+        (() => {
+          function textOf(el) {
+            return (el && el.innerText) ? el.innerText.trim() : "";
+          }
+
+          function attr(el, name) {
+            const value = el.getAttribute(name);
+            return value == null ? "" : String(value);
+          }
+
+          function classListString(el) {
+            if (!el || !el.classList) { return ""; }
+            return Array.from(el.classList).join(" ");
+          }
+
+          function collectAncestors(el, maxDepth = 6) {
+            const out = [];
+            let current = el.parentElement;
+            let depth = 0;
+
+            while (current && depth < maxDepth) {
+              out.push({
+                tag: (current.tagName || "").toLowerCase(),
+                id: current.id || "",
+                className: classListString(current),
+                role: attr(current, "role")
+              });
+              current = current.parentElement;
+              depth += 1;
+            }
+
+            return out;
+          }
+
+          function nearestTextBlockLength(el) {
+            const block = el.closest("figure, article, section, main, div, p, li");
+            if (!block) { return 0; }
+            return textOf(block).length;
+          }
+
+          function filenameFromUrl(url) {
+            try {
+              const parsed = new URL(url, document.baseURI);
+              const path = parsed.pathname || "";
+              const segment = path.split("/").filter(Boolean).pop() || "";
+              return segment.toLowerCase();
+            } catch {
+              return "";
+            }
+          }
+
+          const images = Array.from(document.images);
+
+          return JSON.stringify(images.map((img, index) => {
+            const rect = img.getBoundingClientRect();
+            const figure = img.closest("figure");
+            const link = img.closest("a");
+            const currentSrc = img.currentSrc || img.src || attr(img, "src");
+            const computedStyle = window.getComputedStyle(img);
+            const isVisible =
+              rect.width > 0 &&
+              rect.height > 0 &&
+              computedStyle.visibility !== "hidden" &&
+              computedStyle.display !== "none" &&
+              computedStyle.opacity !== "0";
+
+            return {
+              index,
+              src: attr(img, "src"),
+              currentSrc,
+              alt: img.alt || "",
+              title: img.title || "",
+              id: img.id || "",
+              className: classListString(img),
+              naturalWidth: Number(img.naturalWidth || 0),
+              naturalHeight: Number(img.naturalHeight || 0),
+              renderedWidth: Number(rect.width || 0),
+              renderedHeight: Number(rect.height || 0),
+              top: Number(rect.top + window.scrollY || 0),
+              left: Number(rect.left + window.scrollX || 0),
+              loading: attr(img, "loading"),
+              decoding: attr(img, "decoding"),
+              role: attr(img, "role"),
+              ariaHidden: attr(img, "aria-hidden"),
+              isVisible,
+              inArticle: !!img.closest("article, main, [role='main'], .content, .post, .entry, .article, .markdown-body"),
+              inHeader: !!img.closest("header, [role='banner'], .header, .site-header"),
+              inNav: !!img.closest("nav, .nav, .navbar, .menu"),
+              inFooter: !!img.closest("footer, .footer, .site-footer"),
+              inAside: !!img.closest("aside, .sidebar"),
+              inFigure: !!figure,
+              figcaption: figure ? textOf(figure.querySelector("figcaption")) : "",
+              linkedHref: link ? (link.href || "") : "",
+              linkedToRoot: link ? (() => {
+                try {
+                  const parsed = new URL(link.href, document.baseURI);
+                  return parsed.pathname === "/" || parsed.pathname === "";
+                } catch {
+                  return false;
+                }
+              })() : false,
+              filename: filenameFromUrl(currentSrc),
+              isDataUri: currentSrc.startsWith("data:"),
+              isSvg: currentSrc.toLowerCase().includes(".svg") || currentSrc.startsWith("data:image/svg"),
+              nearestTextBlockLength: nearestTextBlockLength(img),
+              ancestors: collectAncestors(img, 6)
+            };
+          }));
+        })()
         """#
     }
 }
