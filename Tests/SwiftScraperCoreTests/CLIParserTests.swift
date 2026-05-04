@@ -410,6 +410,55 @@ final class CLIParserTests: XCTestCase {
             XCTAssertEqual(error as? ScraperError, .unknownOption("--wat"))
         }
     }
+
+    func testPDFBasicParsing() throws {
+        let command = try CLIParser.parse(arguments: ["--pdf", "notes.md"])
+
+        guard case .pdf(let config) = command else {
+            return XCTFail("pdf command expected")
+        }
+
+        XCTAssertTrue(config.inputFile.path.hasSuffix("/notes.md"))
+        XCTAssertTrue(config.outputFile.path.hasSuffix("/notes.pdf"))
+        XCTAssertFalse(config.verbose)
+    }
+
+    func testPDFCustomOutputPath() throws {
+        let command = try CLIParser.parse(arguments: ["--pdf", "notes.md", "--output", "out/custom.pdf"])
+
+        guard case .pdf(let config) = command else {
+            return XCTFail("pdf command expected")
+        }
+
+        XCTAssertTrue(config.inputFile.path.hasSuffix("/notes.md"))
+        XCTAssertTrue(config.outputFile.path.hasSuffix("/out/custom.pdf"))
+    }
+
+    func testPDFVerboseFlagPropagated() throws {
+        let command = try CLIParser.parse(arguments: ["--pdf", "notes.md", "--verbose"])
+
+        guard case .pdf(let config) = command else {
+            return XCTFail("pdf command expected")
+        }
+
+        XCTAssertTrue(config.verbose)
+    }
+
+    func testPDFMissingArgumentFails() {
+        XCTAssertThrowsError(try CLIParser.parse(arguments: ["--pdf"])) { error in
+            XCTAssertEqual(error as? ScraperError, .missingOptionValue("--pdf"))
+        }
+    }
+
+    func testPDFAutoNamingWithoutExtension() throws {
+        let command = try CLIParser.parse(arguments: ["--pdf", "README"])
+
+        guard case .pdf(let config) = command else {
+            return XCTFail("pdf command expected")
+        }
+
+        XCTAssertEqual(config.outputFile.lastPathComponent, "README.pdf")
+    }
 }
 
 final class ExtractionScriptTests: XCTestCase {
