@@ -6,6 +6,7 @@ macOS 標準の `WKWebView` を使って、JavaScript 実行後のページ内�
 ## 特徴
 - `WKWebView` ベースで JS レンダリング後の DOM を取得
 - `--cookie` / `--cookie-file` でセッション状態を注入
+- `--header` でカスタム HTTP ヘッダーを追加（Accept-Language 等）
 - 固定待機、自動スクロール、セレクタ待機、テキスト待機、DOM 安定待機を組み合わせ可能
 - HTML 全体、`body` テキスト、特定要素、本文候補、構造確認レポートを抽出可能
 - HTML の pretty print と Markdown 変換に対応
@@ -49,6 +50,7 @@ swift run swift-scraper -- https://example.com
 ```text
 --cookie <spec>                Cookie を 1 件追加
 --cookie-file <path>           Cookie JSON を読み込む
+--header <Name: Value>         HTTP ヘッダーを追加。複数指定可
 --persistent-store             永続 DataStore を使う
 --visibility <mode>            windowless | hidden-window | visible-window
 --viewport <width>x<height>    WebView サイズ。既定 1440x900
@@ -145,7 +147,17 @@ swift run swift-scraper -- \
   --cookie-file cookies.json
 ```
 
-### 7. sitemap から batch 実行する
+### 7. カスタム HTTP ヘッダーを送る
+```bash
+swift run swift-scraper -- \
+  https://example.com/docs \
+  --header 'Accept-Language: en,en-US;q=0.9' \
+  --header 'X-Custom-Header: value'
+```
+
+ロケール検出でリダイレクトされるサイトに対して、`Accept-Language` ヘッダーで英語版を強制取得する場合などに使います。
+
+### 8. sitemap から batch 実行する
 ```bash
 swift run swift-scraper -- \
   https://example.com \
@@ -156,7 +168,7 @@ swift run swift-scraper -- \
   --output out/sitemap-batch.json
 ```
 
-### 8. URL ファイルから batch 実行する
+### 9. URL ファイルから batch 実行する
 `urls.txt`:
 
 ```text

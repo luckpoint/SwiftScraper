@@ -11,6 +11,7 @@ public enum CLIParser {
         var url: URL?
         var cookies: [CookieDefinition] = []
         var cookieFiles: [URL] = []
+        var customHeaders: [String: String] = [:]
         var dataStoreMode: DataStoreMode = .ephemeral
         var visibility: VisibilityMode = .windowless
         var viewport = Viewport.default
@@ -51,6 +52,10 @@ public enum CLIParser {
             case "--cookie-file":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 cookieFiles.append(resolvePath(raw))
+            case "--header":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                let (name, value) = try parseHeader(raw)
+                customHeaders[name] = value
             case "--persistent-store":
                 dataStoreMode = .persistent
             case "--visibility":
@@ -236,6 +241,7 @@ public enum CLIParser {
             ScraperConfiguration(
                 url: url,
                 cookies: cookies,
+                customHeaders: customHeaders,
                 dataStoreMode: dataStoreMode,
                 visibility: visibility,
                 viewport: viewport,
@@ -270,6 +276,7 @@ public enum CLIParser {
       --url <url>                    対象 URL を明示指定
       --cookie <spec>                Cookie を 1 件追加
       --cookie-file <path>           Cookie JSON を読み込む
+      --header <Name: Value>         HTTP ヘッダーを追加。複数指定可
       --persistent-store             永続 DataStore を使う
       --visibility <mode>            windowless | hidden-window | visible-window
       --viewport <width>x<height>    WebView サイズ。既定 1440x900
@@ -307,6 +314,21 @@ public enum CLIParser {
       JSON array or object with keys:
       name, value, domain, path, secure, httpOnly, expires
     """
+
+    static func parseHeader(_ raw: String) throws -> (String, String) {
+        guard let colonIndex = raw.firstIndex(of: ":") else {
+            throw ScraperError.invalidArgument("--header は 'Name: Value' 形式で指定してください")
+        }
+
+        let name = raw[raw.startIndex..<colonIndex].trimmingCharacters(in: .whitespaces)
+        let value = raw[raw.index(after: colonIndex)...].trimmingCharacters(in: .whitespaces)
+
+        guard !name.isEmpty else {
+            throw ScraperError.invalidArgument("--header のヘッダー名が空です")
+        }
+
+        return (name, value)
+    }
 
     public static func parseCookie(_ raw: String) throws -> CookieDefinition {
         var values: [String: String] = [:]

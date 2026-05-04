@@ -168,6 +168,7 @@ public struct CookieDefinition: Codable, Equatable, Sendable {
 public struct ScraperConfiguration: Equatable, Sendable {
     public let url: URL
     public let cookies: [CookieDefinition]
+    public let customHeaders: [String: String]
     public let dataStoreMode: DataStoreMode
     public let visibility: VisibilityMode
     public let viewport: Viewport
@@ -184,6 +185,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
     public init(
         url: URL,
         cookies: [CookieDefinition],
+        customHeaders: [String: String] = [:],
         dataStoreMode: DataStoreMode,
         visibility: VisibilityMode,
         viewport: Viewport,
@@ -199,6 +201,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
     ) {
         self.url = url
         self.cookies = cookies
+        self.customHeaders = customHeaders
         self.dataStoreMode = dataStoreMode
         self.visibility = visibility
         self.viewport = viewport
@@ -219,6 +222,7 @@ extension ScraperConfiguration {
         ScraperConfiguration(
             url: url,
             cookies: cookies,
+            customHeaders: customHeaders,
             dataStoreMode: dataStoreMode,
             visibility: visibility,
             viewport: viewport,

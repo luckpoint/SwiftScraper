@@ -107,6 +107,9 @@ public final class WebScraper: NSObject {
             } else {
                 var request = URLRequest(url: configuration.url)
                 request.timeoutInterval = configuration.timeouts.load
+                for (name, value) in configuration.customHeaders {
+                    request.setValue(value, forHTTPHeaderField: name)
+                }
                 webView.load(request)
             }
         }
