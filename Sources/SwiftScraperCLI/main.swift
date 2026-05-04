@@ -15,6 +15,9 @@ struct SwiftScraperCLI {
                 logger.info("CLI を開始します")
                 let exitCode = ScraperLauncher(configuration: configuration).run()
                 Foundation.exit(exitCode)
+            case .pdf(let pdfConfiguration):
+                let exitCode = PDFLauncher(configuration: pdfConfiguration).run()
+                Foundation.exit(exitCode)
             }
         } catch {
             write(error.localizedDescription, to: FileHandle.standardError)

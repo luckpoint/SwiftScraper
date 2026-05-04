@@ -13,6 +13,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/jaredhowland/html-to-markdown-swift.git", from: "0.9.0"),
         .package(url: "https://github.com/scinfu/SwiftSoup.git", exact: "2.11.2"),
+        .package(url: "https://github.com/JohnSundell/Ink.git", from: "0.6.0"),
     ],
     targets: [
         .target(
@@ -20,6 +21,7 @@ let package = Package(
             dependencies: [
                 .product(name: "HTMLToMarkdown", package: "html-to-markdown-swift"),
                 "SwiftSoup",
+                "Ink",
             ]
         ),
         .executableTarget(

@@ -8,6 +8,7 @@ public enum CLIParser {
             return .help(usage)
         }
 
+        var pdfInputPath: String?
         var url: URL?
         var cookies: [CookieDefinition] = []
         var cookieFiles: [URL] = []
@@ -42,6 +43,9 @@ public enum CLIParser {
             let argument = normalizedArguments[index]
 
             switch argument {
+            case "--pdf":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                pdfInputPath = raw
             case "--url":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 try ensureSingleURL(existing: url)
@@ -172,6 +176,18 @@ public enum CLIParser {
             index += 1
         }
 
+        if let pdfInputPath {
+            let inputFile = resolvePath(pdfInputPath)
+            let outputFile: URL
+            if case .file(let fileURL) = output {
+                outputFile = fileURL
+            } else {
+                let base = inputFile.deletingPathExtension()
+                outputFile = base.appendingPathExtension("pdf")
+            }
+            return .pdf(PDFConfiguration(inputFile: inputFile, outputFile: outputFile, verbose: verbose))
+        }
+
         if extractionFlagCount > 1 {
             throw ScraperError.invalidArgument(
                 "抽出モードは `--body-text` / `--selector-inner-html` / `--content-only` / `--inspect-structure` のうち 1 つだけ指定できます"
@@ -271,6 +287,7 @@ public enum CLIParser {
     public static let usage = """
     Usage:
       swift-scraper <url> [options]
+      swift-scraper --pdf <file.md> [--output <file.pdf>] [--verbose]
 
     Options:
       --url <url>                    対象 URL を明示指定
@@ -304,6 +321,7 @@ public enum CLIParser {
       --image-include-maybe          maybe 判定の画像も出力に残す
       --image-debug                  画像スコアと理由を stderr に JSON で出す
       --pretty-print                 HTML 系の出力を SwiftSoup で整形
+      --pdf <file.md>                Markdown ファイルを PDF に変換
       --verbose                      stderr に進行ログを出す
       --help                         ヘルプを表示
 

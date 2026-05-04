@@ -239,9 +239,22 @@ extension ScraperConfiguration {
     }
 }
 
+public struct PDFConfiguration: Equatable, Sendable {
+    public let inputFile: URL
+    public let outputFile: URL
+    public let verbose: Bool
+
+    public init(inputFile: URL, outputFile: URL, verbose: Bool) {
+        self.inputFile = inputFile
+        self.outputFile = outputFile
+        self.verbose = verbose
+    }
+}
+
 public enum CLICommand: Equatable {
     case help(String)
     case run(ScraperConfiguration)
+    case pdf(PDFConfiguration)
 }
 
 public enum ScraperError: LocalizedError, Equatable, Sendable {
@@ -263,6 +276,8 @@ public enum ScraperError: LocalizedError, Equatable, Sendable {
     case markdownFailed(String)
     case prettyPrintFailed(String)
     case outputFailed(String)
+    case pdfInputNotFound(String)
+    case pdfRenderFailed(String)
 
     public var errorDescription: String? {
         switch self {
@@ -302,6 +317,10 @@ public enum ScraperError: LocalizedError, Equatable, Sendable {
             return "整形に失敗しました: \(message)"
         case .outputFailed(let message):
             return "出力に失敗しました: \(message)"
+        case .pdfInputNotFound(let message):
+            return "入力ファイルが見つかりません: \(message)"
+        case .pdfRenderFailed(let message):
+            return "PDF 生成に失敗しました: \(message)"
         }
     }
 }
