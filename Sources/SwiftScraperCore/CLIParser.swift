@@ -17,6 +17,7 @@ public enum CLIParser {
         var url: URL?
         var cookies: [CookieDefinition] = []
         var cookieFiles: [URL] = []
+        var cookieJar: URL?
         var customHeaders: [String: String] = [:]
         var dataStoreMode: DataStoreMode = .ephemeral
         var visibility: VisibilityMode = .windowless
@@ -70,6 +71,12 @@ public enum CLIParser {
             case "--cookie-file":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 cookieFiles.append(resolvePath(raw))
+            case "--cookie-jar":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                guard cookieJar == nil else {
+                    throw ScraperError.invalidArgument("`--cookie-jar` は 1 つだけ指定してください")
+                }
+                cookieJar = resolvePath(raw)
             case "--header":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 let (name, value) = try parseHeader(raw)
@@ -223,6 +230,10 @@ public enum CLIParser {
                 throw ScraperError.invalidArgument("`--concurrency` は `--bidi-server` では使用できません")
             }
 
+            if cookieJar != nil {
+                throw ScraperError.invalidArgument("`--cookie-jar` は `--bidi-server` では使用できません")
+            }
+
             if case .file = output {
                 throw ScraperError.invalidArgument("`--output` は `--bidi-server` では使用できません")
             }
@@ -269,6 +280,10 @@ public enum CLIParser {
             throw ScraperError.invalidArgument("`--concurrency` は `--sitemap` または `--url-file` と一緒に指定してください")
         }
 
+        if cookieJar != nil && batchInput != nil {
+            throw ScraperError.invalidArgument("`--cookie-jar` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+        }
+
         if case .urlFile = batchInput, url != nil {
             throw ScraperError.invalidArgument("`--url-file` を使う場合は URL を同時に指定できません")
         }
@@ -312,6 +327,7 @@ public enum CLIParser {
             ScraperConfiguration(
                 url: url,
                 cookies: cookies,
+                cookieJar: cookieJar,
                 customHeaders: customHeaders,
                 dataStoreMode: dataStoreMode,
                 visibility: visibility,
@@ -352,6 +368,7 @@ public enum CLIParser {
       --url <url>                    対象 URL を明示指定
       --cookie <spec>                Cookie を 1 件追加
       --cookie-file <path>           Cookie JSON を読み込む
+      --cookie-jar <path>            CookieJar JSON を読み込み、実行後に保存する
       --header <Name: Value>         HTTP ヘッダーを追加。複数指定可
       --persistent-store             永続 DataStore を使う
       --visibility <mode>            windowless | hidden-window | visible-window
@@ -390,6 +407,7 @@ public enum CLIParser {
     Cookie file format:
       JSON array or object with keys:
       name, value, domain, path, secure, httpOnly, expires
+      --cookie-jar は同じ JSON 形式を使い、保存時は JSON array で書き出します。
     """
 
     static func parseHeader(_ raw: String) throws -> (String, String) {

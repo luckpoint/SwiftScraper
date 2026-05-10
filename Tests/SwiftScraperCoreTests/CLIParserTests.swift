@@ -20,6 +20,7 @@ final class CLIParserTests: XCTestCase {
         XCTAssertEqual(configuration.outputFormat, .plain)
         XCTAssertEqual(configuration.extraction, .outerHTML)
         XCTAssertEqual(configuration.imageExtraction, .disabled)
+        XCTAssertNil(configuration.cookieJar)
         XCTAssertNil(configuration.batch)
         XCTAssertFalse(configuration.prettyPrint)
         XCTAssertFalse(configuration.verbose)
@@ -223,6 +224,124 @@ final class CLIParserTests: XCTestCase {
         XCTAssertEqual(configuration.cookies[0].value, "xyz")
         XCTAssertEqual(configuration.cookies[0].domain, "example.com")
         XCTAssertTrue(configuration.cookies[0].secure)
+    }
+
+    func testCookieJarOptionParsesWithoutLoadingFile() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com",
+            "--cookie-jar", "tmp/cookies.json",
+        ])
+
+        guard case .run(let configuration) = command else {
+            return XCTFail("run configuration expected")
+        }
+
+        let expected = URL(
+            fileURLWithPath: "tmp/cookies.json",
+            relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        ).standardizedFileURL
+
+        XCTAssertEqual(configuration.cookieJar, expected)
+        XCTAssertTrue(configuration.cookies.isEmpty)
+    }
+
+    func testCookieJarCannotBeCombinedWithSitemapBatch() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--sitemap",
+                "--cookie-jar", "cookies.json",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--cookie-jar` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+            )
+        }
+    }
+
+    func testCookieJarCannotBeCombinedWithURLFileBatch() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "--url-file", "urls.txt",
+                "--cookie-jar", "cookies.json",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--cookie-jar` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+            )
+        }
+    }
+
+    func testDuplicateCookieJarOptionFails() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--cookie-jar", "cookies.json",
+                "--cookie-jar", "other-cookies.json",
+            ])
+        ) { error in
+            XCTAssertEqual(error as? ScraperError, .invalidArgument("`--cookie-jar` は 1 つだけ指定してください"))
+        }
+    }
+
+    func testCookieJarStoreLoadsMissingFileAsEmpty() throws {
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("json")
+
+        XCTAssertEqual(try CookieJarStore.loadIfPresent(from: tempURL), [])
+    }
+
+    func testCookieJarStoreSavesAndLoadsDefinitions() throws {
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("json")
+
+        defer {
+            try? FileManager.default.removeItem(at: tempURL)
+        }
+
+        let definitions = [
+            CookieDefinition(
+                name: "prefs",
+                value: "dark",
+                domain: "example.com",
+                path: "/",
+                secure: false,
+                httpOnly: false
+            ),
+            CookieDefinition(
+                name: "session",
+                value: "abc",
+                domain: "example.com",
+                path: "/",
+                secure: true,
+                httpOnly: true,
+                expires: Date(timeIntervalSince1970: 1_798_675_200)
+            ),
+        ]
+
+        try CookieJarStore.save(definitions: definitions, to: tempURL)
+
+        XCTAssertEqual(try CookieJarStore.loadIfPresent(from: tempURL), definitions)
+    }
+
+    func testCookieDefinitionCanBeCreatedFromHTTPCookie() throws {
+        let expires = Date(timeIntervalSince1970: 1_798_675_200)
+        let definition = CookieDefinition(
+            name: "session",
+            value: "abc",
+            domain: "example.com",
+            path: "/app",
+            secure: true,
+            httpOnly: true,
+            expires: expires
+        )
+
+        let cookie = try definition.makeHTTPCookie()
+        XCTAssertEqual(CookieDefinition(cookie: cookie), definition)
     }
 
     func testAutoScrollOptionParses() throws {

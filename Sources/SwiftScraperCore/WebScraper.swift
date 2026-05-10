@@ -57,19 +57,24 @@ public final class WebScraper: NSObject {
         try await injectCookies()
         try await loadPage()
         try await waitForRenderIfNeeded()
-        return try await extract()
+        let output = try await extract()
+        try await saveCookieJarIfNeeded()
+        return output
     }
 
     private func injectCookies() async throws {
-        guard !configuration.cookies.isEmpty else {
+        let store = webView.configuration.websiteDataStore.httpCookieStore
+        var cookies = try loadCookieJarCookiesIfNeeded()
+        cookies.append(contentsOf: configuration.cookies)
+
+        guard !cookies.isEmpty else {
             logger.info("Cookie 注入はありません")
             return
         }
 
-        logger.info("Cookie を \(configuration.cookies.count) 件注入します")
-        let store = webView.configuration.websiteDataStore.httpCookieStore
+        logger.info("Cookie を \(cookies.count) 件注入します")
 
-        for cookie in configuration.cookies {
+        for cookie in cookies {
             let httpCookie = try cookie.makeHTTPCookie()
             await setCookie(httpCookie, store: store)
             logger.info("Cookie 注入完了: \(cookie.name) @ \(cookie.domain)")
@@ -79,6 +84,27 @@ public final class WebScraper: NSObject {
             let injected = await getAllCookies(from: store)
             logger.info("CookieStore 件数: \(injected.count)")
         }
+    }
+
+    private func loadCookieJarCookiesIfNeeded() throws -> [CookieDefinition] {
+        guard let cookieJar = configuration.cookieJar else {
+            return []
+        }
+
+        let cookies = try CookieJarStore.loadIfPresent(from: cookieJar)
+        logger.info("CookieJar を \(cookies.count) 件読み込みました: \(cookieJar.path)")
+        return cookies
+    }
+
+    private func saveCookieJarIfNeeded() async throws {
+        guard let cookieJar = configuration.cookieJar else {
+            return
+        }
+
+        let store = webView.configuration.websiteDataStore.httpCookieStore
+        let cookies = await getAllCookies(from: store)
+        try CookieJarStore.save(cookies: cookies, to: cookieJar)
+        logger.info("CookieJar を \(cookies.count) 件保存しました: \(cookieJar.path)")
     }
 
     private func loadPage() async throws {

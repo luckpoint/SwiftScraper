@@ -5,7 +5,7 @@ macOS 標準の `WKWebView` を使って、JavaScript 実行後のページ内�
 
 ## 特徴
 - `WKWebView` ベースで JS レンダリング後の DOM を取得
-- `--cookie` / `--cookie-file` でセッション状態を注入
+- `--cookie` / `--cookie-file` / `--cookie-jar` でセッション状態を注入・保存
 - `--header` でカスタム HTTP ヘッダーを追加（Accept-Language 等）
 - 固定待機、自動スクロール、セレクタ待機、テキスト待機、DOM 安定待機を組み合わせ可能
 - HTML 全体、`body` テキスト、特定要素、本文候補、構造確認レポートを抽出可能
@@ -50,6 +50,7 @@ swift run swift-scraper -- https://example.com
 ```text
 --cookie <spec>                Cookie を 1 件追加
 --cookie-file <path>           Cookie JSON を読み込む
+--cookie-jar <path>            CookieJar JSON を読み込み、実行後に保存する
 --header <Name: Value>         HTTP ヘッダーを追加。複数指定可
 --persistent-store             永続 DataStore を使う
 --visibility <mode>            windowless | hidden-window | visible-window
@@ -147,7 +148,18 @@ swift run swift-scraper -- \
   --cookie-file cookies.json
 ```
 
-### 7. カスタム HTTP ヘッダーを送る
+### 7. CookieJar JSON を使う
+`--cookie-jar` は指定ファイルが存在すればロード前に Cookie を注入し、実行後に WebKit の CookieStore に残っている Cookie を同じJSONファイルへ保存します。ファイルが存在しない場合は空の CookieJar として扱い、実行後に作成します。
+
+```bash
+swift run swift-scraper -- \
+  https://example.com/dashboard \
+  --cookie-jar cookies.json
+```
+
+CookieJar の形式は `--cookie-file` と同じです。保存時は JSON array として出力します。`--sitemap` / `--url-file` の batch 実行では `--cookie-jar` は使用できません。
+
+### 8. カスタム HTTP ヘッダーを送る
 ```bash
 swift run swift-scraper -- \
   https://example.com/docs \
@@ -157,7 +169,7 @@ swift run swift-scraper -- \
 
 ロケール検出でリダイレクトされるサイトに対して、`Accept-Language` ヘッダーで英語版を強制取得する場合などに使います。
 
-### 8. sitemap から batch 実行する
+### 9. sitemap から batch 実行する
 ```bash
 swift run swift-scraper -- \
   https://example.com \
@@ -168,7 +180,7 @@ swift run swift-scraper -- \
   --output out/sitemap-batch.json
 ```
 
-### 9. URL ファイルから batch 実行する
+### 10. URL ファイルから batch 実行する
 `urls.txt`:
 
 ```text

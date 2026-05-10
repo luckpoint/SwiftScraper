@@ -135,6 +135,18 @@ public struct CookieDefinition: Codable, Equatable, Sendable {
         self.expires = expires
     }
 
+    public init(cookie: HTTPCookie) {
+        self.init(
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path,
+            secure: cookie.isSecure,
+            httpOnly: cookie.isHTTPOnly,
+            expires: cookie.expiresDate
+        )
+    }
+
     public func makeHTTPCookie() throws -> HTTPCookie {
         var properties: [HTTPCookiePropertyKey: Any] = [
             .name: name,
@@ -168,6 +180,7 @@ public struct CookieDefinition: Codable, Equatable, Sendable {
 public struct ScraperConfiguration: Equatable, Sendable {
     public let url: URL
     public let cookies: [CookieDefinition]
+    public let cookieJar: URL?
     public let customHeaders: [String: String]
     public let dataStoreMode: DataStoreMode
     public let visibility: VisibilityMode
@@ -185,6 +198,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
     public init(
         url: URL,
         cookies: [CookieDefinition],
+        cookieJar: URL? = nil,
         customHeaders: [String: String] = [:],
         dataStoreMode: DataStoreMode,
         visibility: VisibilityMode,
@@ -201,6 +215,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
     ) {
         self.url = url
         self.cookies = cookies
+        self.cookieJar = cookieJar
         self.customHeaders = customHeaders
         self.dataStoreMode = dataStoreMode
         self.visibility = visibility
@@ -222,6 +237,7 @@ extension ScraperConfiguration {
         ScraperConfiguration(
             url: url,
             cookies: cookies,
+            cookieJar: cookieJar,
             customHeaders: customHeaders,
             dataStoreMode: dataStoreMode,
             visibility: visibility,
@@ -303,6 +319,7 @@ public enum ScraperError: LocalizedError, Equatable, Sendable {
     case missingOptionValue(String)
     case invalidCookieSpec(String)
     case invalidCookieFile(String)
+    case cookieJarFailed(String)
     case loadFailed(String)
     case timedOut(phase: String, timeout: TimeInterval)
     case javaScriptFailed(String)
@@ -333,6 +350,8 @@ public enum ScraperError: LocalizedError, Equatable, Sendable {
             return "Cookie 指定が不正です: \(message)"
         case .invalidCookieFile(let message):
             return "Cookie ファイルを読み込めません: \(message)"
+        case .cookieJarFailed(let message):
+            return "CookieJar を扱えません: \(message)"
         case .loadFailed(let message):
             return "ページロードに失敗しました: \(message)"
         case .timedOut(let phase, let timeout):
