@@ -251,10 +251,48 @@ public struct PDFConfiguration: Equatable, Sendable {
     }
 }
 
+public struct BiDiServerConfiguration: Equatable, Sendable {
+    public let host: String
+    public let port: Int
+    public let initialURL: URL?
+    public let cookies: [CookieDefinition]
+    public let customHeaders: [String: String]
+    public let dataStoreMode: DataStoreMode
+    public let visibility: VisibilityMode
+    public let viewport: Viewport
+    public let timeouts: Timeouts
+    public let verbose: Bool
+
+    public init(
+        host: String,
+        port: Int,
+        initialURL: URL?,
+        cookies: [CookieDefinition],
+        customHeaders: [String: String],
+        dataStoreMode: DataStoreMode,
+        visibility: VisibilityMode,
+        viewport: Viewport,
+        timeouts: Timeouts,
+        verbose: Bool
+    ) {
+        self.host = host
+        self.port = port
+        self.initialURL = initialURL
+        self.cookies = cookies
+        self.customHeaders = customHeaders
+        self.dataStoreMode = dataStoreMode
+        self.visibility = visibility
+        self.viewport = viewport
+        self.timeouts = timeouts
+        self.verbose = verbose
+    }
+}
+
 public enum CLICommand: Equatable {
     case help(String)
     case run(ScraperConfiguration)
     case pdf(PDFConfiguration)
+    case bidiServer(BiDiServerConfiguration)
 }
 
 public enum ScraperError: LocalizedError, Equatable, Sendable {

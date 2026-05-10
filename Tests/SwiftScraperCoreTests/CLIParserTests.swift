@@ -50,6 +50,83 @@ final class CLIParserTests: XCTestCase {
         XCTAssertTrue(outputURL.path.hasSuffix("/out/output.html"))
     }
 
+    func testBiDiServerParsesDefaults() throws {
+        let command = try CLIParser.parse(arguments: ["--bidi-server"])
+
+        guard case .bidiServer(let configuration) = command else {
+            return XCTFail("bidi server configuration expected")
+        }
+
+        XCTAssertEqual(configuration.host, "127.0.0.1")
+        XCTAssertEqual(configuration.port, 9222)
+        XCTAssertNil(configuration.initialURL)
+        XCTAssertEqual(configuration.visibility, .windowless)
+        XCTAssertEqual(configuration.dataStoreMode, .ephemeral)
+        XCTAssertEqual(configuration.viewport, .default)
+        XCTAssertEqual(configuration.timeouts, .default)
+        XCTAssertTrue(configuration.cookies.isEmpty)
+        XCTAssertTrue(configuration.customHeaders.isEmpty)
+        XCTAssertFalse(configuration.verbose)
+    }
+
+    func testBiDiServerParsesInitialURLAndOptions() throws {
+        let command = try CLIParser.parse(arguments: [
+            "--bidi-server",
+            "--bidi-host", "0.0.0.0",
+            "--bidi-port", "9333",
+            "--url", "https://example.com/app",
+            "--visibility", "hidden-window",
+            "--viewport", "1024x768",
+            "--load-timeout", "20",
+            "--js-timeout", "12",
+            "--header", "User-Agent: SwiftScraper",
+            "--cookie", "name=session;value=abc;domain=example.com",
+            "--persistent-store",
+            "--verbose",
+        ])
+
+        guard case .bidiServer(let configuration) = command else {
+            return XCTFail("bidi server configuration expected")
+        }
+
+        XCTAssertEqual(configuration.host, "0.0.0.0")
+        XCTAssertEqual(configuration.port, 9333)
+        XCTAssertEqual(configuration.initialURL?.absoluteString, "https://example.com/app")
+        XCTAssertEqual(configuration.visibility, .hiddenWindow)
+        XCTAssertEqual(configuration.viewport, Viewport(width: 1024, height: 768))
+        XCTAssertEqual(configuration.timeouts.load, 20)
+        XCTAssertEqual(configuration.timeouts.javaScript, 12)
+        XCTAssertEqual(configuration.customHeaders["User-Agent"], "SwiftScraper")
+        XCTAssertEqual(configuration.cookies.count, 1)
+        XCTAssertEqual(configuration.dataStoreMode, .persistent)
+        XCTAssertTrue(configuration.verbose)
+    }
+
+    func testBiDiHostPortRequireBiDiServer() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--bidi-port", "9333",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--bidi-host` / `--bidi-port` は `--bidi-server` と一緒に指定してください")
+            )
+        }
+    }
+
+    func testBiDiServerRejectsOutputOptions() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "--bidi-server",
+                "--output", "out/page.html",
+            ])
+        ) { error in
+            XCTAssertEqual(error as? ScraperError, .invalidArgument("`--output` は `--bidi-server` では使用できません"))
+        }
+    }
+
     func testCookieAndWaitOptionsParse() throws {
         let command = try CLIParser.parse(arguments: [
             "https://example.com/app",

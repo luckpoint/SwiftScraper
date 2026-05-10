@@ -9,6 +9,11 @@ public enum CLIParser {
         }
 
         var pdfInputPath: String?
+        var bidiServer = false
+        var bidiHost = "127.0.0.1"
+        var bidiPort = 9222
+        var bidiHostSpecified = false
+        var bidiPortSpecified = false
         var url: URL?
         var cookies: [CookieDefinition] = []
         var cookieFiles: [URL] = []
@@ -43,6 +48,15 @@ public enum CLIParser {
             let argument = normalizedArguments[index]
 
             switch argument {
+            case "--bidi-server":
+                bidiServer = true
+            case "--bidi-host":
+                bidiHostSpecified = true
+                bidiHost = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+            case "--bidi-port":
+                bidiPortSpecified = true
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                bidiPort = try parsePort(raw, option: argument)
             case "--pdf":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 pdfInputPath = raw
@@ -176,6 +190,14 @@ public enum CLIParser {
             index += 1
         }
 
+        if bidiServer && pdfInputPath != nil {
+            throw ScraperError.invalidArgument("`--bidi-server` と `--pdf` は同時に指定できません")
+        }
+
+        if !bidiServer && (bidiHostSpecified || bidiPortSpecified) {
+            throw ScraperError.invalidArgument("`--bidi-host` / `--bidi-port` は `--bidi-server` と一緒に指定してください")
+        }
+
         if let pdfInputPath {
             let inputFile = resolvePath(pdfInputPath)
             let outputFile: URL
@@ -186,6 +208,43 @@ public enum CLIParser {
                 outputFile = base.appendingPathExtension("pdf")
             }
             return .pdf(PDFConfiguration(inputFile: inputFile, outputFile: outputFile, verbose: verbose))
+        }
+
+        for cookieFile in cookieFiles {
+            cookies.append(contentsOf: try loadCookies(from: cookieFile))
+        }
+
+        if bidiServer {
+            if batchInput != nil {
+                throw ScraperError.invalidArgument("`--bidi-server` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+            }
+
+            if concurrencySpecified {
+                throw ScraperError.invalidArgument("`--concurrency` は `--bidi-server` では使用できません")
+            }
+
+            if case .file = output {
+                throw ScraperError.invalidArgument("`--output` は `--bidi-server` では使用できません")
+            }
+
+            if extractionFlagCount > 0 || outputFormat != .plain || imageExtractionEnabled || prettyPrint {
+                throw ScraperError.invalidArgument("抽出・整形・変換オプションは `--bidi-server` では使用できません")
+            }
+
+            return .bidiServer(
+                BiDiServerConfiguration(
+                    host: bidiHost,
+                    port: bidiPort,
+                    initialURL: url,
+                    cookies: cookies,
+                    customHeaders: customHeaders,
+                    dataStoreMode: dataStoreMode,
+                    visibility: visibility,
+                    viewport: viewport,
+                    timeouts: timeouts,
+                    verbose: verbose
+                )
+            )
         }
 
         if extractionFlagCount > 1 {
@@ -208,10 +267,6 @@ public enum CLIParser {
 
         if concurrencySpecified && batchInput == nil {
             throw ScraperError.invalidArgument("`--concurrency` は `--sitemap` または `--url-file` と一緒に指定してください")
-        }
-
-        for cookieFile in cookieFiles {
-            cookies.append(contentsOf: try loadCookies(from: cookieFile))
         }
 
         if case .urlFile = batchInput, url != nil {
@@ -288,8 +343,12 @@ public enum CLIParser {
     Usage:
       swift-scraper <url> [options]
       swift-scraper --pdf <file.md> [--output <file.pdf>] [--verbose]
+      swift-scraper --bidi-server [url] [--bidi-host <host>] [--bidi-port <port>] [options]
 
     Options:
+      --bidi-server                 WKWebView BiDi bridge server を起動
+      --bidi-host <host>            BiDi server の bind host。既定 127.0.0.1
+      --bidi-port <port>            BiDi server の bind port。既定 9222
       --url <url>                    対象 URL を明示指定
       --cookie <spec>                Cookie を 1 件追加
       --cookie-file <path>           Cookie JSON を読み込む
@@ -509,6 +568,15 @@ public enum CLIParser {
         }
 
         return value
+    }
+
+    private static func parsePort(_ raw: String, option: String) throws -> Int {
+        let port = try parsePositiveInt(raw, option: option)
+        guard port <= 65_535 else {
+            throw ScraperError.invalidArgument("\(option) は 1 以上 65535 以下で指定してください")
+        }
+
+        return port
     }
 
     private static func parseBoolean(_ raw: String, key: String) throws -> Bool {
