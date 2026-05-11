@@ -24,7 +24,36 @@ final class BiDiDispatcher {
                     ]
                 )
 
-            case "session.subscribe", "session.unsubscribe":
+            case "session.new":
+                return .success(
+                    id: id,
+                    result: [
+                        "capabilities": .object([
+                            "browserName": .string("SwiftScraper"),
+                            "browserVersion": .string("0"),
+                            "platformName": .string("macOS"),
+                            "webSocketUrl": .bool(true),
+                        ]),
+                        "sessionId": .string("swiftscraper"),
+                    ]
+                )
+
+            case "session.end", "session.subscribe", "session.unsubscribe":
+                return .success(id: id)
+
+            case "browser.getUserContexts":
+                return .success(
+                    id: id,
+                    result: [
+                        "userContexts": .array([
+                            .object([
+                                "userContext": .string("default"),
+                            ]),
+                        ]),
+                    ]
+                )
+
+            case "browser.close":
                 return .success(id: id)
 
             case "browsingContext.getTree":
@@ -36,6 +65,7 @@ final class BiDiDispatcher {
                             .object([
                                 "children": .array([]),
                                 "context": .string(BiDiWebViewHost.contextID),
+                                "userContext": .string("default"),
                                 "url": .string(host.currentURLString()),
                             ]),
                         ]),
@@ -49,11 +79,11 @@ final class BiDiDispatcher {
                     throw BiDiProtocolError.invalidArgument("url is required")
                 }
 
-                try await host.load(url: url)
+                let navigationID = try await host.load(url: url)
                 return .success(
                     id: id,
                     result: [
-                        "navigation": .string(UUID().uuidString),
+                        "navigation": .string(navigationID),
                         "url": .string(url.absoluteString),
                     ]
                 )
@@ -65,11 +95,11 @@ final class BiDiDispatcher {
                     throw BiDiProtocolError.invalidArgument("current context has no reloadable URL")
                 }
 
-                try await host.load(url: url)
+                let navigationID = try await host.load(url: url)
                 return .success(
                     id: id,
                     result: [
-                        "navigation": .string(UUID().uuidString),
+                        "navigation": .string(navigationID),
                         "url": .string(url.absoluteString),
                     ]
                 )

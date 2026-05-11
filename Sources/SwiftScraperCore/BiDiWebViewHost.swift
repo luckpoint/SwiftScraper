@@ -12,6 +12,8 @@ final class BiDiWebViewHost: NSObject {
     private let webView: WKWebView
     private let presentation: BiDiWebViewPresentation
     private var navigationContinuation: CheckedContinuation<Void, Error>?
+    private var activeNavigationID: String?
+    private var activeNavigationURL: String?
     private var navigationTimeoutTask: Task<Void, Never>?
 
     var eventSink: (@Sendable (BiDiEvent) -> Void)?
@@ -44,6 +46,10 @@ final class BiDiWebViewHost: NSObject {
         let frame = NSRect(x: 0, y: 0, width: configuration.viewport.width, height: configuration.viewport.height)
         let webView = WKWebView(frame: frame, configuration: webConfiguration)
         webView.setFrameSize(frame.size)
+        if let userAgent = configuration.customHeaders.userAgentHeaderValue {
+            webView.customUserAgent = userAgent
+            logger.info("BiDi custom User-Agent configured")
+        }
 
         self.webView = webView
         self.presentation = BiDiWebViewPresentation(
@@ -71,7 +77,7 @@ final class BiDiWebViewHost: NSObject {
         try await injectCookies()
 
         if let initialURL = configuration.initialURL {
-            try await load(url: initialURL)
+            _ = try await load(url: initialURL)
         }
     }
 
@@ -86,12 +92,21 @@ final class BiDiWebViewHost: NSObject {
         webView.url?.absoluteString ?? "about:blank"
     }
 
-    func load(url: URL) async throws {
+    func load(url: URL) async throws -> String {
         guard navigationContinuation == nil else {
             throw BiDiProtocolError.invalidArgument("navigation is already in progress")
         }
 
+        let navigationID = UUID().uuidString
+        activeNavigationID = navigationID
+        activeNavigationURL = url.absoluteString
+
         logger.info("BiDi navigate: \(url.absoluteString)")
+        emitBrowsingContextEvent(
+            method: "browsingContext.navigationStarted",
+            navigationID: navigationID,
+            url: url.absoluteString
+        )
 
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             navigationContinuation = continuation
@@ -122,6 +137,8 @@ final class BiDiWebViewHost: NSObject {
                 webView.load(request)
             }
         }
+
+        return navigationID
     }
 
     func evaluateExpression(_ expression: String, awaitPromise: Bool) async throws -> JSONValue {
@@ -233,11 +250,31 @@ final class BiDiWebViewHost: NSObject {
         }
 
         navigationContinuation = nil
+        let navigationID = activeNavigationID
+        let requestedNavigationURL = activeNavigationURL
+        let navigationURL = currentURLString()
+        activeNavigationID = nil
+        activeNavigationURL = nil
 
         switch result {
         case .success:
+            emitBrowsingContextEvent(
+                method: "browsingContext.domContentLoaded",
+                navigationID: navigationID,
+                url: navigationURL
+            )
+            emitBrowsingContextEvent(
+                method: "browsingContext.load",
+                navigationID: navigationID,
+                url: navigationURL
+            )
             continuation.resume()
         case .failure(let error):
+            emitBrowsingContextEvent(
+                method: "browsingContext.navigationFailed",
+                navigationID: navigationID,
+                url: requestedNavigationURL ?? navigationURL
+            )
             continuation.resume(throwing: error)
         }
     }
@@ -281,6 +318,20 @@ final class BiDiWebViewHost: NSObject {
         )
     }
 
+    private func emitBrowsingContextEvent(method: String, navigationID: String?, url: String) {
+        eventSink?(
+            BiDiEvent(
+                method: method,
+                params: [
+                    "context": .string(Self.contextID),
+                    "navigation": navigationID.map(JSONValue.string) ?? .null,
+                    "timestamp": .int(Int(Date().timeIntervalSince1970 * 1000)),
+                    "url": .string(url),
+                ]
+            )
+        )
+    }
+
     private static let consoleBridgeScript = """
     (() => {
       const levels = ["log", "info", "warn", "error", "debug"];
@@ -313,6 +364,14 @@ final class BiDiWebViewHost: NSObject {
       }
     })();
     """
+}
+
+private extension Dictionary where Key == String, Value == String {
+    var userAgentHeaderValue: String? {
+        first { name, _ in
+            name.caseInsensitiveCompare("User-Agent") == .orderedSame
+        }?.value
+    }
 }
 
 @MainActor
@@ -348,16 +407,17 @@ extension BiDiWebViewHost: WKScriptMessageHandler {
 }
 
 @MainActor
-private final class BiDiWebViewPresentation {
+private final class BiDiWebViewPresentation: NSObject, NSWindowDelegate {
     private let visibility: VisibilityMode
     private let window: NSWindow?
 
     init(visibility: VisibilityMode, frame: NSRect, webView: WKWebView) {
         self.visibility = visibility
+        let createdWindow: NSWindow?
 
         switch visibility {
         case .windowless:
-            self.window = nil
+            createdWindow = nil
         case .hiddenWindow, .visibleWindow:
             let window = NSWindow(
                 contentRect: frame,
@@ -368,12 +428,16 @@ private final class BiDiWebViewPresentation {
             window.isReleasedWhenClosed = false
             window.title = "SwiftScraper BiDi"
             window.contentView = NSView(frame: frame)
+            window.contentView?.autoresizingMask = [.width, .height]
             window.contentView?.addSubview(webView)
             webView.frame = window.contentView?.bounds ?? frame
             webView.autoresizingMask = [.width, .height]
-            window.collectionBehavior = [.ignoresCycle, .transient]
-            self.window = window
+            createdWindow = window
         }
+
+        self.window = createdWindow
+        super.init()
+        self.window?.delegate = self
     }
 
     func activateIfNeeded() {
@@ -383,12 +447,23 @@ private final class BiDiWebViewPresentation {
         case .hiddenWindow:
             window?.orderOut(nil)
         case .visibleWindow:
+            window?.center()
+            window?.level = .normal
             window?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 
     func deactivate() {
+        window?.delegate = nil
         window?.orderOut(nil)
         window?.close()
+    }
+
+    nonisolated func windowShouldClose(_ sender: NSWindow) -> Bool {
+        Task { @MainActor in
+            sender.orderOut(nil)
+        }
+        return false
     }
 }

@@ -161,7 +161,14 @@ extension JSONValue {
         case .object(let value):
             return .object([
                 "type": .string("object"),
-                "value": .object(value.mapValues { $0.remoteValue() }),
+                "value": .array(
+                    value.keys.sorted().map { key in
+                        .array([
+                            .string(key),
+                            value[key]?.remoteValue() ?? .null,
+                        ])
+                    }
+                ),
             ])
         }
     }
