@@ -63,12 +63,7 @@ final class BiDiWebSocketServer: @unchecked Sendable {
     }
 
     func broadcast(_ event: BiDiEvent) {
-        guard let data = try? JSONEncoder().encode(event),
-              let text = String(data: data, encoding: .utf8) else {
-            return
-        }
-
-        hub.broadcast(text)
+        hub.broadcast(event)
     }
 }
 
@@ -78,6 +73,7 @@ private final class BiDiWebSocketFrameHandler: ChannelInboundHandler, @unchecked
 
     private let dispatcher: BiDiDispatcher
     private let hub: BiDiWebSocketHub
+    private let clientSession = BiDiClientSession()
 
     init(dispatcher: BiDiDispatcher, hub: BiDiWebSocketHub) {
         self.dispatcher = dispatcher
@@ -85,7 +81,7 @@ private final class BiDiWebSocketFrameHandler: ChannelInboundHandler, @unchecked
     }
 
     func handlerAdded(context: ChannelHandlerContext) {
-        hub.add(context.channel)
+        hub.add(context.channel, session: clientSession)
     }
 
     func handlerRemoved(context: ChannelHandlerContext) {
@@ -125,7 +121,7 @@ private final class BiDiWebSocketFrameHandler: ChannelInboundHandler, @unchecked
 
             do {
                 let request = try JSONDecoder().decode(BiDiRequest.self, from: Data(text.utf8))
-                let response = await dispatcher.handle(request)
+                let response = await dispatcher.handle(request, clientSession: clientSession)
                 let responseData = try JSONEncoder().encode(response)
                 responseText = String(data: responseData, encoding: .utf8) ?? "{}"
             } catch {
@@ -170,24 +166,36 @@ private final class BiDiWebSocketFrameHandler: ChannelInboundHandler, @unchecked
 }
 
 private final class BiDiWebSocketHub: @unchecked Sendable {
-    private let lock = NSLock()
-    private var channels: [ObjectIdentifier: Channel] = [:]
+    private struct Connection {
+        let channel: Channel
+        let session: BiDiClientSession
+    }
 
-    func add(_ channel: Channel) {
+    private let lock = NSLock()
+    private var connections: [ObjectIdentifier: Connection] = [:]
+
+    func add(_ channel: Channel, session: BiDiClientSession) {
         lock.lock()
-        channels[ObjectIdentifier(channel)] = channel
+        connections[ObjectIdentifier(channel)] = Connection(channel: channel, session: session)
         lock.unlock()
     }
 
     func remove(_ channel: Channel) {
         lock.lock()
-        channels.removeValue(forKey: ObjectIdentifier(channel))
+        connections.removeValue(forKey: ObjectIdentifier(channel))
         lock.unlock()
     }
 
-    func broadcast(_ text: String) {
+    func broadcast(_ event: BiDiEvent) {
+        guard let data = try? JSONEncoder().encode(event),
+              let text = String(data: data, encoding: .utf8) else {
+            return
+        }
+
         lock.lock()
-        let activeChannels = Array(channels.values)
+        let activeChannels = connections.values
+            .filter { $0.session.isSubscribed(to: event) }
+            .map(\.channel)
         lock.unlock()
 
         for channel in activeChannels {

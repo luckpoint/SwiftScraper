@@ -12,6 +12,7 @@ macOS 標準の `WKWebView` を使って、JavaScript 実行後のページ内�
 - HTML の pretty print と Markdown 変換に対応
 - 画像候補の特徴量を JS で集め、Swift の heuristic でロゴや UI 画像を落とせる
 - `sitemap.xml` または URL ファイルから複数ページを batch 実行可能
+- SwiftNIO の WebSocket サーバで WKWebView を操作する WebDriver BiDi 風 bridge を起動可能
 - `windowless` / `hidden-window` / `visible-window` で露出度を切り替え可能
 
 ## 動作要件
@@ -48,6 +49,9 @@ swift run swift-scraper -- https://example.com
 
 ### 主なオプション
 ```text
+--bidi-server                 WKWebView BiDi bridge server を起動
+--bidi-host <host>            BiDi server の bind host。既定 127.0.0.1
+--bidi-port <port>            BiDi server の bind port。既定 9222
 --cookie <spec>                Cookie を 1 件追加
 --cookie-file <path>           Cookie JSON を読み込む
 --cookie-jar <path>            CookieJar JSON を読み込み、実行後に保存する
@@ -198,6 +202,59 @@ swift run swift-scraper -- \
   --output out/url-file-batch.json
 ```
 
+### 11. WebDriver BiDi bridge を起動する
+`--bidi-server` は SwiftNIO の WebSocket サーバを起動し、外部プログラムから JSON コマンドで同一プロセス内の `WKWebView` を操作できるようにします。endpoint は `ws://127.0.0.1:9222/session` です。
+
+```bash
+swift run swift-scraper -- \
+  --bidi-server \
+  --bidi-port 9222 \
+  --verbose
+```
+
+初期 URL を指定する場合:
+
+```bash
+swift run swift-scraper -- \
+  --bidi-server \
+  --url https://example.com \
+  --visibility hidden-window
+```
+
+対応する主な method:
+- `session.status`
+- `browsingContext.getTree`
+- `browsingContext.navigate`
+- `browsingContext.reload`
+- `browsingContext.captureScreenshot`
+- `browsingContext.setViewport`
+- `script.evaluate`
+- `script.callFunction`
+- `script.addPreloadScript`
+- `script.removePreloadScript`
+- `storage.getCookies`
+- `storage.setCookie`
+- `storage.deleteCookies`
+- `emulation.setScreenOrientationOverride` compatibility no-op
+- `swiftScraper:scrape.getHTML` / `scrape.getHTML`
+- `swiftScraper:scrape.getText` / `scrape.getText`
+- `swiftScraper:scrape.waitForSelector`
+- `swiftScraper:scrape.waitForText`
+- `swiftScraper:scrape.waitForFunction`
+- `swiftScraper:scrape.waitForDOMStable`
+- `swiftScraper:scrape.autoScroll`
+- `swiftScraper:scrape.extract`
+- `swiftScraper:scrape.getCookies` / `scrape.getCookies`
+- `log.entryAdded` event
+
+P0/P1 と SwiftScraper scraping extension を外部サイト依存なしで確認する場合:
+
+```bash
+npm run puppeteer:bidi-p1
+```
+
+これは WKWebView を WebSocket 経由で操作する scraping 用 bridge です。Chrome や Firefox の WebDriver BiDi と完全互換のブラウザ実装ではありません。詳細は [11. WebDriver BiDi bridge](docs/11-webdriver-bidi-bridge.md) を参照してください。
+
 ## 抽出モード
 | モード | 説明 |
 | --- | --- |
@@ -258,9 +315,12 @@ batch 実行時の最終出力は JSON です。各ページの成功 / 失敗�
 - [07. デバッグ運用](docs/07-debug-operability.md)
 - [08. Batch 実行](docs/08-batch-processing.md)
 - [09. 画像抽出と heuristic](docs/09-image-extraction.md)
+- [10. PDF 生成](docs/10-pdf-generation.md)
+- [11. WebDriver BiDi bridge](docs/11-webdriver-bidi-bridge.md)
 
 ## 制約
 - macOS 専用です
 - gzip 圧縮された sitemap (`.xml.gz`) は URL 判定のみ対応で、中身の展開は未対応です
 - `windowless` / `hidden-window` は露出を抑えるためのモードで、完全 headless を保証するものではありません
 - 画像 heuristic の初期実装はページ単位判定までです。batch 頻度補正やドメイン別 blacklist は未実装です
+- WebDriver BiDi bridge は scraping 用 subset であり、WebDriver BiDi 仕様の完全実装ではありません

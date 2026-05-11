@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "puppeteer:bidi-p1": "node scripts/puppeteer-bidi-p1-smoke.mjs",
     "puppeteer:google": "node scripts/puppeteer-google-search.mjs",
     "puppeteer:yahoo": "node scripts/puppeteer-yahoo-search.mjs"
   },

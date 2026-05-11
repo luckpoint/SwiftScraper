@@ -68,6 +68,28 @@ extension JSONValue {
         return nil
     }
 
+    var intValue: Int? {
+        switch self {
+        case .int(let value):
+            return value
+        case .double(let value) where value.rounded() == value:
+            return Int(value)
+        default:
+            return nil
+        }
+    }
+
+    var doubleValue: Double? {
+        switch self {
+        case .int(let value):
+            return Double(value)
+        case .double(let value):
+            return value
+        default:
+            return nil
+        }
+    }
+
     var objectValue: [String: JSONValue]? {
         if case .object(let value) = self {
             return value
@@ -186,25 +208,36 @@ struct BiDiResponse: Encodable, Sendable {
     let result: [String: JSONValue]?
     let error: String?
     let message: String?
+    let stacktrace: String?
 
     static func success(id: Int, result: [String: JSONValue] = [:]) -> BiDiResponse {
-        BiDiResponse(id: id, type: "success", result: result, error: nil, message: nil)
+        BiDiResponse(id: id, type: "success", result: result, error: nil, message: nil, stacktrace: nil)
     }
 
-    static func failure(id: Int, error: String, message: String) -> BiDiResponse {
-        BiDiResponse(id: id, type: "error", result: nil, error: error, message: message)
+    static func failure(id: Int, error: String, message: String, stacktrace: String? = nil) -> BiDiResponse {
+        BiDiResponse(id: id, type: "error", result: nil, error: error, message: message, stacktrace: stacktrace)
     }
 }
 
 struct BiDiEvent: Encodable, Sendable {
+    let type = "event"
     let method: String
     let params: [String: JSONValue]
+
+    var contextID: String? {
+        if let context = params["context"]?.stringValue {
+            return context
+        }
+
+        return params["source"]?.objectValue?["context"]?.stringValue
+    }
 }
 
 enum BiDiProtocolError: Error, Equatable {
     case invalidArgument(String)
     case noSuchFrame(String)
     case unknownCommand(String)
+    case javascriptError(message: String, stacktrace: String?)
 
     var code: String {
         switch self {
@@ -214,6 +247,8 @@ enum BiDiProtocolError: Error, Equatable {
             return "no such frame"
         case .unknownCommand:
             return "unknown command"
+        case .javascriptError:
+            return "javascript error"
         }
     }
 
@@ -221,6 +256,145 @@ enum BiDiProtocolError: Error, Equatable {
         switch self {
         case .invalidArgument(let message), .noSuchFrame(let message), .unknownCommand(let message):
             return message
+        case .javascriptError(let message, _):
+            return message
         }
+    }
+
+    var stacktrace: String? {
+        switch self {
+        case .javascriptError(_, let stacktrace):
+            return stacktrace
+        case .invalidArgument, .noSuchFrame, .unknownCommand:
+            return nil
+        }
+    }
+}
+
+enum BiDiNavigationWait: String, Sendable {
+    case none
+    case interactive
+    case complete
+}
+
+struct BiDiScrapeWaitResult: Sendable {
+    let matched: Bool
+    let elapsedMilliseconds: Int
+    let attempts: Int
+}
+
+struct BiDiScrapeAutoScrollResult: Sendable {
+    let scrollTop: Double
+    let scrollHeight: Double
+    let clientHeight: Double
+    let reachedBottom: Bool
+    let steps: Int
+    let elapsedMilliseconds: Int
+}
+
+struct BiDiScrapeExtractOptions: Sendable {
+    let extraction: ExtractionMode
+    let outputFormat: OutputFormat
+    let prettyPrint: Bool
+    let imageExtraction: ImageExtractionConfiguration
+}
+
+struct BiDiScrapeExtractResult: Sendable {
+    let data: String
+    let imageCandidateCount: Int?
+    let imageKeptCount: Int?
+    let imageDebugJSON: String?
+}
+
+final class BiDiClientSession: @unchecked Sendable {
+    private enum ContextFilter: Sendable, Equatable {
+        case all
+        case only(Set<String>)
+    }
+
+    private let lock = NSLock()
+    private var subscriptions: [String: ContextFilter] = [:]
+
+    func subscribe(events: [String], contexts: Set<String>?) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        for event in events {
+            guard !event.isEmpty else {
+                continue
+            }
+
+            if contexts == nil {
+                subscriptions[event] = .all
+            } else if case .only(var existingContexts) = subscriptions[event] {
+                existingContexts.formUnion(contexts ?? [])
+                subscriptions[event] = .only(existingContexts)
+            } else if subscriptions[event] == nil {
+                subscriptions[event] = .only(contexts ?? [])
+            }
+        }
+    }
+
+    func unsubscribe(events: [String], contexts: Set<String>?) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        for event in events {
+            guard !event.isEmpty else {
+                continue
+            }
+
+            guard let contexts else {
+                subscriptions.removeValue(forKey: event)
+                continue
+            }
+
+            guard let existingFilter = subscriptions[event] else {
+                subscriptions.removeValue(forKey: event)
+                continue
+            }
+
+            guard case .only(let existingContexts) = existingFilter else {
+                subscriptions.removeValue(forKey: event)
+                continue
+            }
+
+            let remainingContexts = existingContexts.subtracting(contexts)
+            if remainingContexts.isEmpty {
+                subscriptions.removeValue(forKey: event)
+            } else {
+                subscriptions[event] = .only(remainingContexts)
+            }
+        }
+    }
+
+    func isSubscribed(to event: BiDiEvent) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+
+        for key in Self.subscriptionKeys(for: event.method) {
+            guard let filter = subscriptions[key] else {
+                continue
+            }
+
+            switch filter {
+            case .all:
+                return true
+            case .only(let contexts):
+                if let contextID = event.contextID, contexts.contains(contextID) {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    private static func subscriptionKeys(for method: String) -> [String] {
+        guard let dotIndex = method.firstIndex(of: ".") else {
+            return [method]
+        }
+
+        return [method, String(method[..<dotIndex])]
     }
 }
