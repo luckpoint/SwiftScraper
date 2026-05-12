@@ -230,3 +230,31 @@ Cookie は `Cookie` header として設定する。ただし `--header 'Cookie: 
 - `href` の path が `.pdf` で終わるリンクだけを対象にする。リダイレクト先が PDF になる download endpoint は対象外。
 - PDF の `Content-Type` は検証しない。HTTP status が 2xx なら保存する。
 - BiDi server の download 制御ではなく、CLI の 1 shot / batch mode として実装している。
+
+## 将来の対応候補
+`.pdf` で終わらない download endpoint から PDF が返るサイトへの対応は、将来の候補として残す。対応時期は未決定で、必要が出た時点で検討する。
+
+全リンクに対して `HEAD` / `GET` を実行すると負荷と時間が大きくなりやすいため、実装する場合は opt-in の軽量 probe として設計する。
+
+想定案:
+
+1. 既存の `.pdf` path 判定は即採用する
+2. `.pdf` で終わらないリンクは DOM 情報から PDF らしい候補に絞る
+3. 絞った候補だけ `HEAD` を試す
+4. `HEAD` が 405 / 403 / 情報不足の場合だけ `Range: bytes=0-1023` 付きの `GET` を試す
+5. `Content-Type: application/pdf` または `Content-Disposition` の PDF filename から PDF と判定できたものだけ保存対象に昇格する
+
+候補絞り込みの例:
+
+- `a[download]`
+- `a[type="application/pdf"]`
+- `href`、link text、`aria-label`、`title` に `pdf` / `download` / `report` / `document` / `whitepaper` などが含まれる
+- `/download`、`/asset`、`/file`、`/documents/` など download endpoint らしい path
+
+安全弁の例:
+
+- デフォルトでは現状維持し、明示オプションでのみ probe する
+- 1 ページあたりの probe 件数上限を設ける
+- 短い timeout と低い concurrency を使う
+- batch 全体で probe 結果を cache する
+- 同一 URL は fragment 除去後に 1 回だけ probe する

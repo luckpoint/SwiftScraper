@@ -1,0 +1,4 @@
+interface:
+  display_name: "SwiftScraper"
+  short_description: "SwiftScraper CLI, PDF, and BiDi workflows"
+  default_prompt: "Use $swiftscraper to scrape a rendered page, download linked PDFs, or operate the BiDi bridge."
