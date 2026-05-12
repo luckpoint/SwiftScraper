@@ -10,7 +10,7 @@ final class BiDiWebViewHost: NSObject {
     private let configuration: BiDiServerConfiguration
     private let logger: StderrLogger
     private let webView: WKWebView
-    private let presentation: BiDiWebViewPresentation
+    private let presentation: WebViewPresentation
     private var navigationContinuation: CheckedContinuation<Void, Error>?
     private var navigationWait: BiDiNavigationWait?
     private var activeNavigationID: String?
@@ -26,34 +26,28 @@ final class BiDiWebViewHost: NSObject {
         self.configuration = configuration
         self.logger = logger
 
-        let dataStore: WKWebsiteDataStore
-        switch configuration.dataStoreMode {
-        case .ephemeral:
-            dataStore = .nonPersistent()
-        case .persistent:
-            dataStore = .default()
-        }
-
         let userContentController = WKUserContentController()
         Self.addBaseUserScripts(to: userContentController)
 
         let webConfiguration = WKWebViewConfiguration()
-        webConfiguration.websiteDataStore = dataStore
+        webConfiguration.websiteDataStore = WebKitSupport.websiteDataStore(for: configuration.dataStoreMode)
         webConfiguration.userContentController = userContentController
 
-        let frame = NSRect(x: 0, y: 0, width: configuration.viewport.width, height: configuration.viewport.height)
-        let webView = WKWebView(frame: frame, configuration: webConfiguration)
-        webView.setFrameSize(frame.size)
+        let frame = WebKitSupport.frame(for: configuration.viewport)
+        let webView = WebKitSupport.makeWebView(frame: frame, configuration: webConfiguration)
         if let userAgent = configuration.customHeaders.userAgentHeaderValue {
             webView.customUserAgent = userAgent
             logger.info("BiDi custom User-Agent configured")
         }
 
         self.webView = webView
-        self.presentation = BiDiWebViewPresentation(
+        self.presentation = WebViewPresentation(
             visibility: configuration.visibility,
+            title: "SwiftScraper BiDi",
             frame: frame,
-            webView: webView
+            webView: webView,
+            visibleActivation: .activateApplication,
+            hidesOnClose: true
         )
 
         super.init()
@@ -139,16 +133,12 @@ final class BiDiWebViewHost: NSObject {
             )
         }
 
-        if url.isFileURL {
-            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
-        } else {
-            var request = URLRequest(url: url)
-            request.timeoutInterval = configuration.timeouts.load
-            for (name, value) in configuration.customHeaders {
-                request.setValue(value, forHTTPHeaderField: name)
-            }
-            webView.load(request)
-        }
+        WebKitSupport.load(
+            url,
+            in: webView,
+            timeout: configuration.timeouts.load,
+            headers: configuration.customHeaders
+        )
     }
 
     func evaluateExpression(_ expression: String, awaitPromise: Bool) async throws -> JSONValue {
@@ -464,20 +454,12 @@ final class BiDiWebViewHost: NSObject {
     }
 
     func getCookies() async -> [HTTPCookie] {
-        await withCheckedContinuation { (continuation: CheckedContinuation<[HTTPCookie], Never>) in
-            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
-                continuation.resume(returning: cookies)
-            }
-        }
+        await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
     }
 
     func setCookie(_ cookie: CookieDefinition) async throws {
         let httpCookie = try cookie.makeHTTPCookie()
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            webView.configuration.websiteDataStore.httpCookieStore.setCookie(httpCookie) {
-                continuation.resume()
-            }
-        }
+        await webView.configuration.websiteDataStore.httpCookieStore.setCookieAsync(httpCookie)
     }
 
     func deleteCookies(matching filter: BiDiCookieFilter) async -> Int {
@@ -485,11 +467,7 @@ final class BiDiWebViewHost: NSObject {
         let store = webView.configuration.websiteDataStore.httpCookieStore
 
         for cookie in cookies {
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                store.delete(cookie) {
-                    continuation.resume()
-                }
-            }
+            await store.deleteCookieAsync(cookie)
         }
 
         return cookies.count
@@ -658,11 +636,7 @@ final class BiDiWebViewHost: NSObject {
 
         for cookie in configuration.cookies {
             let httpCookie = try cookie.makeHTTPCookie()
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                store.setCookie(httpCookie) {
-                    continuation.resume()
-                }
-            }
+            await store.setCookieAsync(httpCookie)
         }
     }
 
@@ -837,8 +811,7 @@ final class BiDiWebViewHost: NSObject {
     }
 
     private func javascriptLiteral(_ value: some Encodable) throws -> String {
-        let data = try JSONEncoder().encode(value)
-        return String(decoding: data, as: UTF8.self)
+        try JavaScriptLiteral.encoded(value)
     }
 
     private func emitConsoleEvent(from body: [String: Any]) {
@@ -1099,79 +1072,5 @@ extension BiDiWebViewHost: WKScriptMessageHandler {
         default:
             return
         }
-    }
-}
-
-@MainActor
-private final class BiDiWebViewPresentation: NSObject, NSWindowDelegate {
-    private let visibility: VisibilityMode
-    private let window: NSWindow?
-
-    init(visibility: VisibilityMode, frame: NSRect, webView: WKWebView) {
-        self.visibility = visibility
-        let createdWindow: NSWindow?
-
-        switch visibility {
-        case .windowless:
-            createdWindow = nil
-        case .hiddenWindow, .visibleWindow:
-            let window = NSWindow(
-                contentRect: frame,
-                styleMask: [.titled, .closable, .resizable],
-                backing: .buffered,
-                defer: false
-            )
-            window.isReleasedWhenClosed = false
-            window.title = "SwiftScraper BiDi"
-            window.contentView = NSView(frame: frame)
-            window.contentView?.autoresizingMask = [.width, .height]
-            window.contentView?.addSubview(webView)
-            webView.frame = window.contentView?.bounds ?? frame
-            webView.autoresizingMask = [.width, .height]
-            createdWindow = window
-        }
-
-        self.window = createdWindow
-        super.init()
-        self.window?.delegate = self
-    }
-
-    func activateIfNeeded() {
-        switch visibility {
-        case .windowless:
-            return
-        case .hiddenWindow:
-            window?.orderOut(nil)
-        case .visibleWindow:
-            window?.center()
-            window?.level = .normal
-            window?.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-        }
-    }
-
-    func deactivate() {
-        window?.delegate = nil
-        window?.orderOut(nil)
-        window?.close()
-    }
-
-    func resize(to size: NSSize) {
-        guard let window else {
-            return
-        }
-
-        window.setContentSize(size)
-        window.contentView?.frame.size = size
-        window.contentView?.subviews.forEach { subview in
-            subview.frame = window.contentView?.bounds ?? NSRect(origin: .zero, size: size)
-        }
-    }
-
-    nonisolated func windowShouldClose(_ sender: NSWindow) -> Bool {
-        Task { @MainActor in
-            sender.orderOut(nil)
-        }
-        return false
     }
 }

@@ -8,6 +8,165 @@ public enum CLIParser {
             return .help(usage)
         }
 
+        var state = ParseState()
+
+        var index = 0
+        while index < normalizedArguments.count {
+            let argument = normalizedArguments[index]
+
+            switch argument {
+            case "--bidi-server":
+                state.bidiServer = true
+            case "--bidi-host":
+                state.bidiHostSpecified = true
+                state.bidiHost = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+            case "--bidi-port":
+                state.bidiPortSpecified = true
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.bidiPort = try parsePort(raw, option: argument)
+            case "--pdf":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.pdfInputPath = raw
+            case "--url":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                try ensureSingleURL(existing: state.url)
+                state.url = try parseURL(raw)
+            case "--cookie":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.cookies.append(try parseCookie(raw))
+            case "--cookie-file":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.cookieFiles.append(resolvePath(raw))
+            case "--cookie-jar":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                guard state.cookieJar == nil else {
+                    throw ScraperError.invalidArgument("`--cookie-jar` は 1 つだけ指定してください")
+                }
+                state.cookieJar = resolvePath(raw)
+            case "--header":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                let (name, value) = try parseHeader(raw)
+                state.customHeaders[name] = value
+            case "--persistent-store":
+                state.dataStoreMode = .persistent
+            case "--visibility":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                guard let parsed = VisibilityMode(rawValue: raw) else {
+                    throw ScraperError.invalidArgument(
+                        "--visibility は \(VisibilityMode.allCases.map(\.rawValue).joined(separator: ", ")) のいずれかを指定してください"
+                    )
+                }
+                state.visibility = parsed
+            case "--viewport":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.viewport = try parseViewport(raw)
+            case "--wait-delay":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.waitDelay = try parseSeconds(raw, option: argument, allowZero: true)
+            case "--auto-scroll":
+                state.autoScrollEnabled = true
+            case "--wait-selector":
+                state.waitSelectors.append(try nextValue(after: &index, arguments: normalizedArguments, option: argument))
+            case "--wait-text":
+                state.waitTexts.append(try nextValue(after: &index, arguments: normalizedArguments, option: argument))
+            case "--poll-interval":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.pollInterval = try parseSeconds(raw, option: argument, allowZero: false)
+            case "--dom-stable-delay":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.domStableDelay = try parseSeconds(raw, option: argument, allowZero: true)
+            case "--load-timeout":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.timeouts = Timeouts(
+                    load: try parseSeconds(raw, option: argument, allowZero: false),
+                    render: state.timeouts.render,
+                    javaScript: state.timeouts.javaScript
+                )
+            case "--wait-timeout":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.timeouts = Timeouts(
+                    load: state.timeouts.load,
+                    render: try parseSeconds(raw, option: argument, allowZero: false),
+                    javaScript: state.timeouts.javaScript
+                )
+            case "--js-timeout":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.timeouts = Timeouts(
+                    load: state.timeouts.load,
+                    render: state.timeouts.render,
+                    javaScript: try parseSeconds(raw, option: argument, allowZero: false)
+                )
+            case "--sitemap":
+                try ensureSingleBatchInput(existing: state.batchInput, incomingOption: argument)
+                state.batchInput = .sitemap
+            case "--concurrency", "--sitemap-concurrency":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.concurrency = try parsePositiveInt(raw, option: argument)
+                state.concurrencySpecified = true
+            case "--url-file":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                try ensureSingleBatchInput(existing: state.batchInput, incomingOption: argument)
+                state.batchInput = .urlFile(resolvePath(raw))
+            case "--output":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.output = .file(resolvePath(raw))
+            case "--markdown":
+                state.outputFormat = .markdown
+            case "--extract-images":
+                state.imageExtractionEnabled = true
+            case "--image-filter":
+                state.imageExtractionEnabled = true
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                guard let parsed = ImageFilterMode(rawValue: raw) else {
+                    throw ScraperError.invalidArgument(
+                        "--image-filter は \(ImageFilterMode.allCases.map(\.rawValue).joined(separator: ", ")) のいずれかを指定してください"
+                    )
+                }
+                state.imageFilter = parsed
+            case "--image-score-threshold":
+                state.imageExtractionEnabled = true
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.imageScoreThreshold = try parseUnitDouble(raw, option: argument)
+            case "--image-include-maybe":
+                state.imageExtractionEnabled = true
+                state.imageIncludeMaybe = true
+            case "--image-debug":
+                state.imageExtractionEnabled = true
+                state.imageDebug = true
+            case "--body-text":
+                state.extractionFlagCount += 1
+                state.extraction = .bodyText
+            case "--selector-inner-html":
+                state.extractionFlagCount += 1
+                state.extraction = .selectorInnerHTML(
+                    try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                )
+            case "--content-only":
+                state.extractionFlagCount += 1
+                state.extraction = .contentOnly
+            case "--inspect-structure":
+                state.extractionFlagCount += 1
+                state.extraction = .structureInspection
+            case "--pretty-print":
+                state.prettyPrint = true
+            case "--verbose":
+                state.verbose = true
+            default:
+                if argument.hasPrefix("-") {
+                    throw ScraperError.unknownOption(argument)
+                }
+
+                try ensureSingleURL(existing: state.url)
+                state.url = try parseURL(argument)
+            }
+
+            index += 1
+        }
+
+        return try state.makeCommand()
+    }
+
+    private struct ParseState {
         var pdfInputPath: String?
         var bidiServer = false
         var bidiHost = "127.0.0.1"
@@ -44,169 +203,36 @@ public enum CLIParser {
         var prettyPrint = false
         var verbose = false
 
-        var index = 0
-        while index < normalizedArguments.count {
-            let argument = normalizedArguments[index]
-
-            switch argument {
-            case "--bidi-server":
-                bidiServer = true
-            case "--bidi-host":
-                bidiHostSpecified = true
-                bidiHost = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-            case "--bidi-port":
-                bidiPortSpecified = true
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                bidiPort = try parsePort(raw, option: argument)
-            case "--pdf":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                pdfInputPath = raw
-            case "--url":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                try ensureSingleURL(existing: url)
-                url = try parseURL(raw)
-            case "--cookie":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                cookies.append(try parseCookie(raw))
-            case "--cookie-file":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                cookieFiles.append(resolvePath(raw))
-            case "--cookie-jar":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                guard cookieJar == nil else {
-                    throw ScraperError.invalidArgument("`--cookie-jar` は 1 つだけ指定してください")
-                }
-                cookieJar = resolvePath(raw)
-            case "--header":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                let (name, value) = try parseHeader(raw)
-                customHeaders[name] = value
-            case "--persistent-store":
-                dataStoreMode = .persistent
-            case "--visibility":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                guard let parsed = VisibilityMode(rawValue: raw) else {
-                    throw ScraperError.invalidArgument(
-                        "--visibility は \(VisibilityMode.allCases.map(\.rawValue).joined(separator: ", ")) のいずれかを指定してください"
-                    )
-                }
-                visibility = parsed
-            case "--viewport":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                viewport = try parseViewport(raw)
-            case "--wait-delay":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                waitDelay = try parseSeconds(raw, option: argument, allowZero: true)
-            case "--auto-scroll":
-                autoScrollEnabled = true
-            case "--wait-selector":
-                waitSelectors.append(try nextValue(after: &index, arguments: normalizedArguments, option: argument))
-            case "--wait-text":
-                waitTexts.append(try nextValue(after: &index, arguments: normalizedArguments, option: argument))
-            case "--poll-interval":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                pollInterval = try parseSeconds(raw, option: argument, allowZero: false)
-            case "--dom-stable-delay":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                domStableDelay = try parseSeconds(raw, option: argument, allowZero: true)
-            case "--load-timeout":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                timeouts = Timeouts(
-                    load: try parseSeconds(raw, option: argument, allowZero: false),
-                    render: timeouts.render,
-                    javaScript: timeouts.javaScript
-                )
-            case "--wait-timeout":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                timeouts = Timeouts(
-                    load: timeouts.load,
-                    render: try parseSeconds(raw, option: argument, allowZero: false),
-                    javaScript: timeouts.javaScript
-                )
-            case "--js-timeout":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                timeouts = Timeouts(
-                    load: timeouts.load,
-                    render: timeouts.render,
-                    javaScript: try parseSeconds(raw, option: argument, allowZero: false)
-                )
-            case "--sitemap":
-                try ensureSingleBatchInput(existing: batchInput, incomingOption: argument)
-                batchInput = .sitemap
-            case "--concurrency", "--sitemap-concurrency":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                concurrency = try parsePositiveInt(raw, option: argument)
-                concurrencySpecified = true
-            case "--url-file":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                try ensureSingleBatchInput(existing: batchInput, incomingOption: argument)
-                batchInput = .urlFile(resolvePath(raw))
-            case "--output":
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                output = .file(resolvePath(raw))
-            case "--markdown":
-                outputFormat = .markdown
-            case "--extract-images":
-                imageExtractionEnabled = true
-            case "--image-filter":
-                imageExtractionEnabled = true
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                guard let parsed = ImageFilterMode(rawValue: raw) else {
-                    throw ScraperError.invalidArgument(
-                        "--image-filter は \(ImageFilterMode.allCases.map(\.rawValue).joined(separator: ", ")) のいずれかを指定してください"
-                    )
-                }
-                imageFilter = parsed
-            case "--image-score-threshold":
-                imageExtractionEnabled = true
-                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                imageScoreThreshold = try parseUnitDouble(raw, option: argument)
-            case "--image-include-maybe":
-                imageExtractionEnabled = true
-                imageIncludeMaybe = true
-            case "--image-debug":
-                imageExtractionEnabled = true
-                imageDebug = true
-            case "--body-text":
-                extractionFlagCount += 1
-                extraction = .bodyText
-            case "--selector-inner-html":
-                extractionFlagCount += 1
-                extraction = .selectorInnerHTML(
-                    try nextValue(after: &index, arguments: normalizedArguments, option: argument)
-                )
-            case "--content-only":
-                extractionFlagCount += 1
-                extraction = .contentOnly
-            case "--inspect-structure":
-                extractionFlagCount += 1
-                extraction = .structureInspection
-            case "--pretty-print":
-                prettyPrint = true
-            case "--verbose":
-                verbose = true
-            default:
-                if argument.hasPrefix("-") {
-                    throw ScraperError.unknownOption(argument)
-                }
-
-                try ensureSingleURL(existing: url)
-                url = try parseURL(argument)
+        mutating func makeCommand() throws -> CLICommand {
+            if bidiServer && pdfInputPath != nil {
+                throw ScraperError.invalidArgument("`--bidi-server` と `--pdf` は同時に指定できません")
             }
 
-            index += 1
+            if !bidiServer && (bidiHostSpecified || bidiPortSpecified) {
+                throw ScraperError.invalidArgument("`--bidi-host` / `--bidi-port` は `--bidi-server` と一緒に指定してください")
+            }
+
+            if let pdfInputPath {
+                return makePDFCommand(inputPath: pdfInputPath)
+            }
+
+            try loadCookieFiles()
+
+            if bidiServer {
+                return try makeBiDiServerCommand()
+            }
+
+            return try makeRunCommand()
         }
 
-        if bidiServer && pdfInputPath != nil {
-            throw ScraperError.invalidArgument("`--bidi-server` と `--pdf` は同時に指定できません")
+        private mutating func loadCookieFiles() throws {
+            for cookieFile in cookieFiles {
+                cookies.append(contentsOf: try CLIParser.loadCookies(from: cookieFile))
+            }
         }
 
-        if !bidiServer && (bidiHostSpecified || bidiPortSpecified) {
-            throw ScraperError.invalidArgument("`--bidi-host` / `--bidi-port` は `--bidi-server` と一緒に指定してください")
-        }
-
-        if let pdfInputPath {
-            let inputFile = resolvePath(pdfInputPath)
+        private func makePDFCommand(inputPath: String) -> CLICommand {
+            let inputFile = CLIParser.resolvePath(inputPath)
             let outputFile: URL
             if case .file(let fileURL) = output {
                 outputFile = fileURL
@@ -214,14 +240,11 @@ public enum CLIParser {
                 let base = inputFile.deletingPathExtension()
                 outputFile = base.appendingPathExtension("pdf")
             }
+
             return .pdf(PDFConfiguration(inputFile: inputFile, outputFile: outputFile, verbose: verbose))
         }
 
-        for cookieFile in cookieFiles {
-            cookies.append(contentsOf: try loadCookies(from: cookieFile))
-        }
-
-        if bidiServer {
+        private func makeBiDiServerCommand() throws -> CLICommand {
             if batchInput != nil {
                 throw ScraperError.invalidArgument("`--bidi-server` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
             }
@@ -258,91 +281,102 @@ public enum CLIParser {
             )
         }
 
-        if extractionFlagCount > 1 {
-            throw ScraperError.invalidArgument(
-                "抽出モードは `--body-text` / `--selector-inner-html` / `--content-only` / `--inspect-structure` のうち 1 つだけ指定できます"
+        private mutating func makeRunCommand() throws -> CLICommand {
+            try validateRunOptions()
+            let resolvedURL = try resolveRunURL()
+
+            let wait = WaitConfiguration(
+                fixedDelay: waitDelay,
+                selectorConditions: waitSelectors,
+                textConditions: waitTexts,
+                pollInterval: pollInterval,
+                domStableDelay: domStableDelay,
+                autoScrollEnabled: autoScrollEnabled
+            )
+
+            let batch = batchInput.map { BatchMode(input: $0, concurrency: concurrency) }
+            let imageExtraction = ImageExtractionConfiguration(
+                enabled: imageExtractionEnabled,
+                filter: imageFilter,
+                scoreThreshold: imageScoreThreshold,
+                includeMaybe: imageIncludeMaybe,
+                debug: imageDebug
+            )
+
+            return .run(
+                ScraperConfiguration(
+                    url: resolvedURL,
+                    cookies: cookies,
+                    cookieJar: cookieJar,
+                    customHeaders: customHeaders,
+                    dataStoreMode: dataStoreMode,
+                    visibility: visibility,
+                    viewport: viewport,
+                    wait: wait,
+                    timeouts: timeouts,
+                    batch: batch,
+                    output: output,
+                    outputFormat: outputFormat,
+                    extraction: extraction,
+                    imageExtraction: imageExtraction,
+                    prettyPrint: prettyPrint,
+                    verbose: verbose
+                )
             )
         }
 
-        if outputFormat == .markdown && prettyPrint {
-            throw ScraperError.invalidArgument("`--markdown` と `--pretty-print` は同時に指定できません")
-        }
+        private func validateRunOptions() throws {
+            if extractionFlagCount > 1 {
+                throw ScraperError.invalidArgument(
+                    "抽出モードは `--body-text` / `--selector-inner-html` / `--content-only` / `--inspect-structure` のうち 1 つだけ指定できます"
+                )
+            }
 
-        if outputFormat == .markdown && !supportsMarkdown(extraction) {
-            throw ScraperError.invalidArgument("`--markdown` は HTML を返す抽出モードでだけ指定できます")
-        }
+            if outputFormat == .markdown && prettyPrint {
+                throw ScraperError.invalidArgument("`--markdown` と `--pretty-print` は同時に指定できません")
+            }
 
-        if imageExtractionEnabled && !supportsImageExtraction(extraction) {
-            throw ScraperError.invalidArgument("`--extract-images` は HTML を返す抽出モードでだけ指定できます")
-        }
+            if outputFormat == .markdown && !CLIParser.supportsMarkdown(extraction) {
+                throw ScraperError.invalidArgument("`--markdown` は HTML を返す抽出モードでだけ指定できます")
+            }
 
-        if concurrencySpecified && batchInput == nil {
-            throw ScraperError.invalidArgument("`--concurrency` は `--sitemap` または `--url-file` と一緒に指定してください")
-        }
+            if imageExtractionEnabled && !CLIParser.supportsImageExtraction(extraction) {
+                throw ScraperError.invalidArgument("`--extract-images` は HTML を返す抽出モードでだけ指定できます")
+            }
 
-        if cookieJar != nil && batchInput != nil {
-            throw ScraperError.invalidArgument("`--cookie-jar` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
-        }
+            if concurrencySpecified && batchInput == nil {
+                throw ScraperError.invalidArgument("`--concurrency` は `--sitemap` または `--url-file` と一緒に指定してください")
+            }
 
-        if case .urlFile = batchInput, url != nil {
-            throw ScraperError.invalidArgument("`--url-file` を使う場合は URL を同時に指定できません")
-        }
+            if cookieJar != nil && batchInput != nil {
+                throw ScraperError.invalidArgument("`--cookie-jar` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+            }
 
-        if case .sitemap = batchInput, url == nil {
-            throw ScraperError.invalidArgument("`--sitemap` を使う場合は対象サイトの URL を指定してください")
-        }
+            if case .urlFile = batchInput, url != nil {
+                throw ScraperError.invalidArgument("`--url-file` を使う場合は URL を同時に指定できません")
+            }
 
-        if let batchInput, url == nil {
-            switch batchInput {
-            case .sitemap:
-                break
-            case .urlFile(let fileURL):
-                url = fileURL
+            if case .sitemap = batchInput, url == nil {
+                throw ScraperError.invalidArgument("`--sitemap` を使う場合は対象サイトの URL を指定してください")
             }
         }
 
-        guard let url else {
-            throw ScraperError.usage(usage)
+        private mutating func resolveRunURL() throws -> URL {
+            if let batchInput, url == nil {
+                switch batchInput {
+                case .sitemap:
+                    break
+                case .urlFile(let fileURL):
+                    url = fileURL
+                }
+            }
+
+            guard let url else {
+                throw ScraperError.usage(CLIParser.usage)
+            }
+
+            return url
         }
-
-        let wait = WaitConfiguration(
-            fixedDelay: waitDelay,
-            selectorConditions: waitSelectors,
-            textConditions: waitTexts,
-            pollInterval: pollInterval,
-            domStableDelay: domStableDelay,
-            autoScrollEnabled: autoScrollEnabled
-        )
-
-        let batch = batchInput.map { BatchMode(input: $0, concurrency: concurrency) }
-        let imageExtraction = ImageExtractionConfiguration(
-            enabled: imageExtractionEnabled,
-            filter: imageFilter,
-            scoreThreshold: imageScoreThreshold,
-            includeMaybe: imageIncludeMaybe,
-            debug: imageDebug
-        )
-
-        return .run(
-            ScraperConfiguration(
-                url: url,
-                cookies: cookies,
-                cookieJar: cookieJar,
-                customHeaders: customHeaders,
-                dataStoreMode: dataStoreMode,
-                visibility: visibility,
-                viewport: viewport,
-                wait: wait,
-                timeouts: timeouts,
-                batch: batch,
-                output: output,
-                outputFormat: outputFormat,
-                extraction: extraction,
-                imageExtraction: imageExtraction,
-                prettyPrint: prettyPrint,
-                verbose: verbose
-            )
-        )
     }
 
     private static func stripSwiftRunArgumentSeparator(from arguments: [String]) -> [String] {
