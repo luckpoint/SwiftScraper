@@ -59,6 +59,30 @@ public final class WebScraper: NSObject {
         return output
     }
 
+    public func collectPDFLinks() async throws -> PDFLinkCollection {
+        logger.info("開始 URL: \(configuration.url.absoluteString)")
+        logger.info("DataStore: \(configuration.dataStoreMode.rawValue), visibility: \(configuration.visibility.rawValue)")
+
+        defer {
+            tearDown()
+        }
+
+        presentation.activateIfNeeded()
+        try await injectCookies()
+        try await loadPage()
+        try await waitForRenderIfNeeded()
+        let payload = try await evaluatePDFLinkPayload()
+        let cookies = await currentCookieDefinitions()
+        try await saveCookieJarIfNeeded()
+
+        return PDFLinkCollection(
+            sourceURL: webView.url ?? configuration.url,
+            links: payload.links,
+            userAgent: payload.normalizedUserAgent,
+            cookies: cookies
+        )
+    }
+
     private func injectCookies() async throws {
         let store = webView.configuration.websiteDataStore.httpCookieStore
         var cookies = try loadCookieJarCookiesIfNeeded()
@@ -102,6 +126,11 @@ public final class WebScraper: NSObject {
         let cookies = await store.allCookies()
         try CookieJarStore.save(cookies: cookies, to: cookieJar)
         logger.info("CookieJar を \(cookies.count) 件保存しました: \(cookieJar.path)")
+    }
+
+    private func currentCookieDefinitions() async -> [CookieDefinition] {
+        let store = webView.configuration.websiteDataStore.httpCookieStore
+        return await store.allCookies().map(CookieDefinition.init(cookie:))
     }
 
     private func loadPage() async throws {
@@ -373,6 +402,25 @@ public final class WebScraper: NSObject {
         }
     }
 
+    private func evaluatePDFLinkPayload() async throws -> PDFLinkExtractionPayload {
+        logger.info("PDF リンクの収集を開始します")
+        let rawValue = try await evaluateJavaScript(Self.makePDFLinkExtractionScript(), phase: "PDF リンク収集")
+        guard case .string(let json) = rawValue else {
+            throw ScraperError.unexpectedJavaScriptResult(
+                phase: "PDF リンク収集",
+                expected: "JSON String"
+            )
+        }
+
+        do {
+            let payload = try JSONDecoder().decode(PDFLinkExtractionPayload.self, from: Data(json.utf8))
+            logger.info("PDF リンクを \(payload.links.count) 件収集しました")
+            return payload
+        } catch {
+            throw ScraperError.javaScriptFailed("PDF リンク JSON の解釈に失敗しました: \(error.localizedDescription)")
+        }
+    }
+
     private func supportsImageExtraction(_ extraction: ExtractionMode) -> Bool {
         switch extraction {
         case .outerHTML, .selectorInnerHTML, .contentOnly:
@@ -618,6 +666,20 @@ private struct RenderConditionResult: Decodable {
     let matched: Bool
 }
 
+private struct PDFLinkExtractionPayload: Decodable {
+    let userAgent: String?
+    let links: [PDFLinkCandidate]
+
+    var normalizedUserAgent: String? {
+        guard let userAgent else {
+            return nil
+        }
+
+        let trimmed = userAgent.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
 private enum JavaScriptValue: Sendable {
     case string(String)
     case null
@@ -632,8 +694,76 @@ extension WebScraper {
         makeImageCandidateScript()
     }
 
+    nonisolated static func makePDFLinkExtractionScriptForTesting() -> String {
+        makePDFLinkExtractionScript()
+    }
+
     nonisolated static func makeAutoScrollScriptForTesting() -> String {
         makeAutoScrollScript()
+    }
+
+    nonisolated private static func makePDFLinkExtractionScript() -> String {
+        """
+        (() => {
+          const seen = new Set();
+          const result = [];
+
+          for (const anchor of document.querySelectorAll('a[href]')) {
+            let parsed;
+            try {
+              parsed = new URL(anchor.getAttribute('href'), document.baseURI);
+            } catch {
+              continue;
+            }
+
+            const protocol = parsed.protocol.toLowerCase();
+            if (protocol !== 'http:' && protocol !== 'https:' && protocol !== 'file:') {
+              continue;
+            }
+
+            if (!parsed.pathname.toLowerCase().endsWith('.pdf')) {
+              continue;
+            }
+
+            parsed.hash = '';
+            const url = parsed.href;
+            if (seen.has(url)) {
+              continue;
+            }
+            seen.add(url);
+
+            const imageAlt = anchor.querySelector('img[alt]')?.getAttribute('alt') || '';
+            const text = firstNonEmpty([
+              anchor.innerText,
+              anchor.textContent,
+              anchor.getAttribute('aria-label'),
+              anchor.getAttribute('title'),
+              imageAlt
+            ]);
+            result.push({ url, text });
+          }
+
+          return JSON.stringify({
+            userAgent: navigator.userAgent || '',
+            links: result
+          });
+
+          function normalize(value) {
+            return (value || '').replace(/\\s+/g, ' ').trim();
+          }
+
+          function firstNonEmpty(values) {
+            for (const value of values) {
+              const normalized = normalize(value);
+              if (normalized) {
+                return normalized;
+              }
+            }
+
+            return '';
+          }
+        })()
+        """
     }
 
     nonisolated private static func makeAutoScrollScript() -> String {

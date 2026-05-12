@@ -267,6 +267,46 @@ public struct PDFConfiguration: Equatable, Sendable {
     }
 }
 
+public struct PDFDownloadConfiguration: Equatable, Sendable {
+    public let url: URL
+    public let outputDirectory: URL
+    public let cookies: [CookieDefinition]
+    public let cookieJar: URL?
+    public let customHeaders: [String: String]
+    public let dataStoreMode: DataStoreMode
+    public let visibility: VisibilityMode
+    public let viewport: Viewport
+    public let wait: WaitConfiguration
+    public let timeouts: Timeouts
+    public let verbose: Bool
+
+    public init(
+        url: URL,
+        outputDirectory: URL,
+        cookies: [CookieDefinition],
+        cookieJar: URL? = nil,
+        customHeaders: [String: String] = [:],
+        dataStoreMode: DataStoreMode,
+        visibility: VisibilityMode,
+        viewport: Viewport,
+        wait: WaitConfiguration,
+        timeouts: Timeouts,
+        verbose: Bool
+    ) {
+        self.url = url
+        self.outputDirectory = outputDirectory
+        self.cookies = cookies
+        self.cookieJar = cookieJar
+        self.customHeaders = customHeaders
+        self.dataStoreMode = dataStoreMode
+        self.visibility = visibility
+        self.viewport = viewport
+        self.wait = wait
+        self.timeouts = timeouts
+        self.verbose = verbose
+    }
+}
+
 public struct BiDiServerConfiguration: Equatable, Sendable {
     public let host: String
     public let port: Int
@@ -308,6 +348,7 @@ public enum CLICommand: Equatable {
     case help(String)
     case run(ScraperConfiguration)
     case pdf(PDFConfiguration)
+    case downloadPDFs(PDFDownloadConfiguration)
     case bidiServer(BiDiServerConfiguration)
 }
 
@@ -333,6 +374,7 @@ public enum ScraperError: LocalizedError, Equatable, Sendable {
     case outputFailed(String)
     case pdfInputNotFound(String)
     case pdfRenderFailed(String)
+    case pdfDownloadFailed(String)
 
     public var errorDescription: String? {
         switch self {
@@ -378,6 +420,8 @@ public enum ScraperError: LocalizedError, Equatable, Sendable {
             return "入力ファイルが見つかりません: \(message)"
         case .pdfRenderFailed(let message):
             return "PDF 生成に失敗しました: \(message)"
+        case .pdfDownloadFailed(let message):
+            return "PDF ダウンロードに失敗しました: \(message)"
         }
     }
 }

@@ -655,6 +655,71 @@ final class CLIParserTests: XCTestCase {
 
         XCTAssertEqual(config.outputFile.lastPathComponent, "README.pdf")
     }
+
+    func testDownloadPDFsParsing() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/legal/trust/",
+            "--download-pdfs", "downloads",
+            "--auto-scroll",
+            "--wait-selector", ".reports",
+            "--header", "Accept-Language: ja",
+            "--cookie", "name=session;value=abc;domain=example.com",
+            "--verbose",
+        ])
+
+        guard case .downloadPDFs(let config) = command else {
+            return XCTFail("downloadPDFs command expected")
+        }
+
+        XCTAssertEqual(config.url.absoluteString, "https://example.com/legal/trust/")
+        XCTAssertTrue(config.outputDirectory.path.hasSuffix("/downloads"))
+        XCTAssertTrue(config.wait.autoScrollEnabled)
+        XCTAssertEqual(config.wait.selectorConditions, [".reports"])
+        XCTAssertEqual(config.customHeaders["Accept-Language"], "ja")
+        XCTAssertEqual(config.cookies.count, 1)
+        XCTAssertTrue(config.verbose)
+    }
+
+    func testDownloadPDFsCannotCombineWithPDFGeneration() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "--pdf", "notes.md",
+                "--download-pdfs", "downloads",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--pdf` と `--download-pdfs` は同時に指定できません")
+            )
+        }
+    }
+
+    func testDownloadPDFsRejectsOutputOptions() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--download-pdfs", "downloads",
+                "--output", "out/result.json",
+            ])
+        ) { error in
+            XCTAssertEqual(error as? ScraperError, .invalidArgument("`--output` は `--download-pdfs` では使用できません"))
+        }
+    }
+
+    func testDownloadPDFsRejectsBatchMode() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--download-pdfs", "downloads",
+                "--sitemap",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--download-pdfs` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+            )
+        }
+    }
 }
 
 final class ExtractionScriptTests: XCTestCase {
@@ -727,6 +792,17 @@ final class ExtractionScriptTests: XCTestCase {
         XCTAssertTrue(script.contains("collectAncestors"))
         XCTAssertTrue(script.contains("nearestTextBlockLength"))
         XCTAssertTrue(script.contains("linkedToRoot"))
+        XCTAssertTrue(script.contains("JSON.stringify"))
+    }
+
+    func testPDFLinkExtractionScriptBuildsAnchorProbe() {
+        let script = WebScraper.makePDFLinkExtractionScriptForTesting()
+
+        XCTAssertTrue(script.contains("querySelectorAll('a[href]')"))
+        XCTAssertTrue(script.contains("new URL(anchor.getAttribute('href'), document.baseURI)"))
+        XCTAssertTrue(script.contains("pathname.toLowerCase().endsWith('.pdf')"))
+        XCTAssertTrue(script.contains("firstNonEmpty"))
+        XCTAssertTrue(script.contains("navigator.userAgent"))
         XCTAssertTrue(script.contains("JSON.stringify"))
     }
 }

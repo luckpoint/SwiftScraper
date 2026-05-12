@@ -18,6 +18,9 @@ struct SwiftScraperCLI {
             case .pdf(let pdfConfiguration):
                 let exitCode = PDFLauncher(configuration: pdfConfiguration).run()
                 Foundation.exit(exitCode)
+            case .downloadPDFs(let configuration):
+                let exitCode = PDFDownloadLauncher(configuration: configuration).run()
+                Foundation.exit(exitCode)
             case .bidiServer(let configuration):
                 let exitCode = BiDiServerLauncher(configuration: configuration).run()
                 Foundation.exit(exitCode)

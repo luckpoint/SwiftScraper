@@ -12,6 +12,7 @@ macOS 標準の `WKWebView` を使って、JavaScript 実行後のページ内�
 - HTML の pretty print と Markdown 変換に対応
 - 画像候補の特徴量を JS で集め、Swift の heuristic でロゴや UI 画像を落とせる
 - `sitemap.xml` または URL ファイルから複数ページを batch 実行可能
+- PDF リンク集ページから `.pdf` リンクを抽出し、サイト別フォルダに保存可能
 - SwiftNIO の WebSocket サーバで WKWebView を操作する WebDriver BiDi 風 bridge を起動可能
 - `windowless` / `hidden-window` / `visible-window` で露出度を切り替え可能
 
@@ -68,6 +69,7 @@ swift run swift-scraper -- https://example.com
 --load-timeout <seconds>       ロード段階タイムアウト。既定 30
 --wait-timeout <seconds>       描画待機タイムアウト。既定 15
 --js-timeout <seconds>         JavaScript 実行タイムアウト。既定 10
+--download-pdfs <directory>    ページ内の PDF リンクを保存
 --output <path>                標準出力ではなくファイルへ保存
 --body-text                    document.body.innerText を抽出
 --selector-inner-html <css>    特定要素の innerHTML を抽出
@@ -125,14 +127,34 @@ swift run swift-scraper -- \
 
 `--extract-images` を付けると、HTML / Markdown 化の前に画像 heuristic を適用し、`drop` 判定の画像を出力から除去します。`--image-debug` はスコアと理由を stderr へ JSON で出します。
 
-### 5. Cookie を直接注入する
+### 5. PDF リンク集から PDF を保存する
+```bash
+swift run swift-scraper -- \
+  https://www.okta.com/legal/trustandcompliance/ \
+  --download-pdfs downloads \
+  --auto-scroll
+```
+
+PDF は `downloads/<host>/<source-path>/` に保存されます。上の例では `downloads/www.okta.com/legal/trustandcompliance/` です。
+
+ファイル名はリンクテキストと元ファイル名から作ります。リンクテキストは空白を正規化し、30文字に切り詰めます。リンクテキストが空なら元ファイル名だけを使います。
+
+```text
+Okta Model Card Governance Ana-okta-model-card-governance-analyzer-2026-02-13.pdf
+```
+
+実行結果は stdout に JSON で出力され、保存先、成功件数、失敗件数、各 PDF の URL と保存パスを確認できます。`--cookie` / `--cookie-file` / `--cookie-jar` / `--header` / 待機系オプションは PDF リンク抽出にも利用できます。
+
+PDF 本体のダウンロードは `URLSession` で行います。Cookie は描画後の `WKWebsiteDataStore.httpCookieStore` から取得し、PDF URL に合うものを `Cookie` ヘッダーへ反映します。`User-Agent` は `--header 'User-Agent: ...'` があればその値を優先し、未指定の場合は WKWebView 内の `navigator.userAgent` を取得して PDF ダウンロード request に設定します。
+
+### 6. Cookie を直接注入する
 ```bash
 swift run swift-scraper -- \
   https://example.com/dashboard \
   --cookie 'name=session;value=abc123;domain=example.com;path=/;secure=true;httpOnly=true'
 ```
 
-### 6. Cookie JSON を使う
+### 7. Cookie JSON を使う
 ```json
 [
   {
@@ -152,7 +174,7 @@ swift run swift-scraper -- \
   --cookie-file cookies.json
 ```
 
-### 7. CookieJar JSON を使う
+### 8. CookieJar JSON を使う
 `--cookie-jar` は指定ファイルが存在すればロード前に Cookie を注入し、実行後に WebKit の CookieStore に残っている Cookie を同じJSONファイルへ保存します。ファイルが存在しない場合は空の CookieJar として扱い、実行後に作成します。
 
 ```bash
@@ -163,7 +185,7 @@ swift run swift-scraper -- \
 
 CookieJar の形式は `--cookie-file` と同じです。保存時は JSON array として出力します。`--sitemap` / `--url-file` の batch 実行では `--cookie-jar` は使用できません。
 
-### 8. カスタム HTTP ヘッダーを送る
+### 9. カスタム HTTP ヘッダーを送る
 ```bash
 swift run swift-scraper -- \
   https://example.com/docs \
@@ -173,7 +195,7 @@ swift run swift-scraper -- \
 
 ロケール検出でリダイレクトされるサイトに対して、`Accept-Language` ヘッダーで英語版を強制取得する場合などに使います。
 
-### 9. sitemap から batch 実行する
+### 10. sitemap から batch 実行する
 ```bash
 swift run swift-scraper -- \
   https://example.com \
@@ -184,7 +206,7 @@ swift run swift-scraper -- \
   --output out/sitemap-batch.json
 ```
 
-### 10. URL ファイルから batch 実行する
+### 11. URL ファイルから batch 実行する
 `urls.txt`:
 
 ```text
@@ -202,7 +224,7 @@ swift run swift-scraper -- \
   --output out/url-file-batch.json
 ```
 
-### 11. WebDriver BiDi bridge を起動する
+### 12. WebDriver BiDi bridge を起動する
 `--bidi-server` は SwiftNIO の WebSocket サーバを起動し、外部プログラムから JSON コマンドで同一プロセス内の `WKWebView` を操作できるようにします。endpoint は `ws://127.0.0.1:9222/session` です。
 
 ```bash
@@ -317,10 +339,12 @@ batch 実行時の最終出力は JSON です。各ページの成功 / 失敗�
 - [09. 画像抽出と heuristic](docs/09-image-extraction.md)
 - [10. PDF 生成](docs/10-pdf-generation.md)
 - [11. WebDriver BiDi bridge](docs/11-webdriver-bidi-bridge.md)
+- [12. PDF リンクダウンロード](docs/12-pdf-link-download.md)
 
 ## 制約
 - macOS 専用です
 - gzip 圧縮された sitemap (`.xml.gz`) は URL 判定のみ対応で、中身の展開は未対応です
 - `windowless` / `hidden-window` は露出を抑えるためのモードで、完全 headless を保証するものではありません
 - 画像 heuristic の初期実装はページ単位判定までです。batch 頻度補正やドメイン別 blacklist は未実装です
+- `--download-pdfs` は単一ページの PDF リンク集を対象とし、`--sitemap` / `--url-file` との batch 実行は未対応です
 - WebDriver BiDi bridge は scraping 用 subset であり、WebDriver BiDi 仕様の完全実装ではありません

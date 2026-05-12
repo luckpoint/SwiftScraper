@@ -225,6 +225,52 @@ final class WebScraperIntegrationTests: XCTestCase {
         try await allowWebKitToSettle()
     }
 
+    func testCollectPDFLinksExtractsRenderedAnchorPDFs() async throws {
+        prepareApplicationIfNeeded()
+
+        let html = """
+        <!doctype html>
+        <html>
+          <body>
+            <main>
+              <a href="docs/one.pdf"> First Report </a>
+              <a href="docs/one.pdf">Duplicate Report</a>
+              <a href="docs/two.PDF"><img alt="Second Report"></a>
+              <a href="docs/not-a-pdf.txt">Ignored</a>
+            </main>
+          </body>
+        </html>
+        """
+
+        let fileURL = try makeHTMLFixture(html)
+        let scraper = WebScraper(
+            configuration: makeConfiguration(
+                url: fileURL,
+                wait: WaitConfiguration(
+                    fixedDelay: 0,
+                    selectorConditions: [],
+                    textConditions: [],
+                    pollInterval: 0.05,
+                    domStableDelay: 0,
+                    autoScrollEnabled: false
+                ),
+                timeouts: Timeouts(load: 5, render: 1, javaScript: 1),
+                extraction: .outerHTML
+            ),
+            logger: StderrLogger(verbose: false)
+        )
+
+        let collection = try await scraper.collectPDFLinks()
+
+        XCTAssertEqual(collection.links.count, 2)
+        XCTAssertFalse((collection.userAgent ?? "").isEmpty)
+        XCTAssertEqual(collection.links[0].text, "First Report")
+        XCTAssertEqual(collection.links[0].url.lastPathComponent, "one.pdf")
+        XCTAssertEqual(collection.links[1].text, "Second Report")
+        XCTAssertEqual(collection.links[1].url.lastPathComponent, "two.PDF")
+        try await allowWebKitToSettle()
+    }
+
     private func makeConfiguration(
         url: URL,
         wait: WaitConfiguration,

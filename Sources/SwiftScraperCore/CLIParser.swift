@@ -27,6 +27,12 @@ public enum CLIParser {
             case "--pdf":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 state.pdfInputPath = raw
+            case "--download-pdfs":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                guard state.pdfDownloadDirectory == nil else {
+                    throw ScraperError.invalidArgument("`--download-pdfs` は 1 つだけ指定してください")
+                }
+                state.pdfDownloadDirectory = resolvePath(raw)
             case "--url":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 try ensureSingleURL(existing: state.url)
@@ -168,6 +174,7 @@ public enum CLIParser {
 
     private struct ParseState {
         var pdfInputPath: String?
+        var pdfDownloadDirectory: URL?
         var bidiServer = false
         var bidiHost = "127.0.0.1"
         var bidiPort = 9222
@@ -208,6 +215,14 @@ public enum CLIParser {
                 throw ScraperError.invalidArgument("`--bidi-server` と `--pdf` は同時に指定できません")
             }
 
+            if bidiServer && pdfDownloadDirectory != nil {
+                throw ScraperError.invalidArgument("`--bidi-server` と `--download-pdfs` は同時に指定できません")
+            }
+
+            if pdfInputPath != nil && pdfDownloadDirectory != nil {
+                throw ScraperError.invalidArgument("`--pdf` と `--download-pdfs` は同時に指定できません")
+            }
+
             if !bidiServer && (bidiHostSpecified || bidiPortSpecified) {
                 throw ScraperError.invalidArgument("`--bidi-host` / `--bidi-port` は `--bidi-server` と一緒に指定してください")
             }
@@ -217,6 +232,10 @@ public enum CLIParser {
             }
 
             try loadCookieFiles()
+
+            if let pdfDownloadDirectory {
+                return try makePDFDownloadCommand(outputDirectory: pdfDownloadDirectory)
+            }
 
             if bidiServer {
                 return try makeBiDiServerCommand()
@@ -242,6 +261,38 @@ public enum CLIParser {
             }
 
             return .pdf(PDFConfiguration(inputFile: inputFile, outputFile: outputFile, verbose: verbose))
+        }
+
+        private func makePDFDownloadCommand(outputDirectory: URL) throws -> CLICommand {
+            try validatePDFDownloadOptions()
+            guard let url else {
+                throw ScraperError.usage(CLIParser.usage)
+            }
+
+            let wait = WaitConfiguration(
+                fixedDelay: waitDelay,
+                selectorConditions: waitSelectors,
+                textConditions: waitTexts,
+                pollInterval: pollInterval,
+                domStableDelay: domStableDelay,
+                autoScrollEnabled: autoScrollEnabled
+            )
+
+            return .downloadPDFs(
+                PDFDownloadConfiguration(
+                    url: url,
+                    outputDirectory: outputDirectory,
+                    cookies: cookies,
+                    cookieJar: cookieJar,
+                    customHeaders: customHeaders,
+                    dataStoreMode: dataStoreMode,
+                    visibility: visibility,
+                    viewport: viewport,
+                    wait: wait,
+                    timeouts: timeouts,
+                    verbose: verbose
+                )
+            )
         }
 
         private func makeBiDiServerCommand() throws -> CLICommand {
@@ -361,6 +412,24 @@ public enum CLIParser {
             }
         }
 
+        private func validatePDFDownloadOptions() throws {
+            if batchInput != nil {
+                throw ScraperError.invalidArgument("`--download-pdfs` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+            }
+
+            if concurrencySpecified {
+                throw ScraperError.invalidArgument("`--concurrency` は `--download-pdfs` では使用できません")
+            }
+
+            if case .file = output {
+                throw ScraperError.invalidArgument("`--output` は `--download-pdfs` では使用できません")
+            }
+
+            if extractionFlagCount > 0 || outputFormat != .plain || imageExtractionEnabled || prettyPrint {
+                throw ScraperError.invalidArgument("抽出・整形・変換オプションは `--download-pdfs` では使用できません")
+            }
+        }
+
         private mutating func resolveRunURL() throws -> URL {
             if let batchInput, url == nil {
                 switch batchInput {
@@ -392,6 +461,7 @@ public enum CLIParser {
     public static let usage = """
     Usage:
       swift-scraper <url> [options]
+      swift-scraper <url> --download-pdfs <directory> [options]
       swift-scraper --pdf <file.md> [--output <file.pdf>] [--verbose]
       swift-scraper --bidi-server [url] [--bidi-host <host>] [--bidi-port <port>] [options]
 
@@ -420,6 +490,7 @@ public enum CLIParser {
       --url-file <path>              1 行 1 URL のファイルを読み込んで複数 URL を取得
       --concurrency <count>          batch 取得時の並列数。既定 4
       --output <path>                標準出力ではなくファイルへ保存
+      --download-pdfs <directory>    ページ内の PDF リンクを保存
       --body-text                    document.body.innerText を抽出
       --selector-inner-html <css>    特定要素の innerHTML を抽出
       --content-only                 ヘッダ・フッタ・サイドバー等を除いた本文候補の HTML を抽出

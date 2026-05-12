@@ -125,9 +125,10 @@ swift run swift-scraper -- \
 ```
 
 ## 併用できないオプション
-BiDi server は長時間起動する操作モードなので、通常の 1 shot scraping / batch / PDF 出力とは分離している。
+BiDi server は長時間起動する操作モードなので、通常の 1 shot scraping / batch / PDF 出力 / PDF リンクダウンロードとは分離している。
 
 - `--pdf`
+- `--download-pdfs`
 - `--sitemap`
 - `--url-file`
 - `--concurrency`
