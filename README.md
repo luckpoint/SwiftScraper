@@ -368,5 +368,5 @@ batch 実行時の最終出力は JSON です。各ページの成功 / 失敗�
 - gzip 圧縮された sitemap (`.xml.gz`) は URL 判定のみ対応で、中身の展開は未対応です
 - `windowless` / `hidden-window` は露出を抑えるためのモードで、完全 headless を保証するものではありません
 - 画像 heuristic の初期実装はページ単位判定までです。batch 頻度補正やドメイン別 blacklist は未実装です
-- `--download-pdfs` / `--download-linked-pdfs` は `href` の path が `.pdf` で終わるリンクだけを対象にします
+- `--download-pdfs` / `--download-linked-pdfs` は `href` の path が `.pdf` で終わるリンクだけを対象にします。`.pdf` で終わらない download endpoint 対応は将来候補で、対応時期は未決定です
 - WebDriver BiDi bridge は scraping 用 subset であり、WebDriver BiDi 仕様の完全実装ではありません
