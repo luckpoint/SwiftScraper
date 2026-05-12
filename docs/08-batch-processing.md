@@ -15,6 +15,9 @@
 - `--url-file <path>`
 - `--concurrency <count>`。既定 4
 - 単ページ実行と同じ待機、抽出、整形、出力先オプション
+- PDF リンク保存:
+  - `--download-pdfs <dir>`: 各ページの PDF リンクだけを保存する PDF 専用 batch
+  - `--download-linked-pdfs <dir>`: 通常 scrape の batch と同時に PDF リンクも保存する sidecar
 
 ## URL ソースの解決
 ### `--sitemap`
@@ -35,6 +38,10 @@
 3. 各 URL について単ページ実行と同じ `WebScraper` を走らせる
 4. 各ページの出力に対して `--markdown` / `--pretty-print` などの整形を適用する
 5. ページ単位の成功 / 失敗を集約し、最終 JSON を返す
+
+`--download-linked-pdfs` を指定した場合は、各ページの通常 scrape と同じ `WKWebView` 実行中に PDF リンクも収集する。PDF 本体は `URLSession` で保存し、結果は `<PDF保存先>/pdf-downloads.json` に書き出す。通常 scrape の batch JSON は stdout または `--output` の指定先に維持される。
+
+`--download-pdfs` を指定した場合は通常 scrape の抽出は行わず、各ページから PDF リンクを収集して保存する。最終出力は PDF ダウンロード結果の batch JSON になる。
 
 ## 出力形式
 - `source.kind`: `sitemap` または `url-file`
@@ -57,3 +64,4 @@
 - `--concurrency` は `--sitemap` または `--url-file` と一緒に指定する
 - `--sitemap` は対象サイト URL が必要で、`--url-file` は URL の同時指定と併用できない
 - `--sitemap` と `--url-file` は同時指定できない
+- `--cookie-jar` は batch 実行では使用できない

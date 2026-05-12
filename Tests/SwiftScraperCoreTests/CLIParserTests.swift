@@ -680,6 +680,80 @@ final class CLIParserTests: XCTestCase {
         XCTAssertTrue(config.verbose)
     }
 
+    func testDownloadPDFsParsesSitemapBatch() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/legal/",
+            "--sitemap",
+            "--concurrency", "2",
+            "--download-pdfs", "downloads",
+        ])
+
+        guard case .downloadPDFs(let config) = command else {
+            return XCTFail("downloadPDFs command expected")
+        }
+
+        XCTAssertEqual(config.url.absoluteString, "https://example.com/legal/")
+        XCTAssertEqual(config.batch, BatchMode(input: .sitemap, concurrency: 2))
+        XCTAssertTrue(config.outputDirectory.path.hasSuffix("/downloads"))
+    }
+
+    func testDownloadPDFsParsesURLFileBatch() throws {
+        let command = try CLIParser.parse(arguments: [
+            "--url-file", "tmp/urls.txt",
+            "--download-pdfs", "downloads",
+            "--concurrency", "3",
+        ])
+
+        guard case .downloadPDFs(let config) = command else {
+            return XCTFail("downloadPDFs command expected")
+        }
+
+        let expectedURLFile = URL(
+            fileURLWithPath: "tmp/urls.txt",
+            relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        ).standardizedFileURL
+
+        XCTAssertEqual(config.url.path, expectedURLFile.path)
+        XCTAssertEqual(config.batch, BatchMode(input: .urlFile(expectedURLFile), concurrency: 3))
+    }
+
+    func testDownloadLinkedPDFsParsesWithNormalScrapeOptions() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/article",
+            "--content-only",
+            "--markdown",
+            "--output", "out/pages.json",
+            "--download-linked-pdfs", "downloads",
+        ])
+
+        guard case .run(let config) = command else {
+            return XCTFail("run command expected")
+        }
+
+        XCTAssertEqual(config.extraction, .contentOnly)
+        XCTAssertEqual(config.outputFormat, .markdown)
+        XCTAssertTrue(config.linkedPDFDownloadDirectory?.path.hasSuffix("/downloads") == true)
+    }
+
+    func testDownloadLinkedPDFsParsesSitemapBatch() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/docs",
+            "--sitemap",
+            "--concurrency", "2",
+            "--content-only",
+            "--download-linked-pdfs", "downloads",
+        ])
+
+        guard case .run(let config) = command else {
+            return XCTFail("run command expected")
+        }
+
+        XCTAssertEqual(config.url.absoluteString, "https://example.com/docs")
+        XCTAssertEqual(config.batch, BatchMode(input: .sitemap, concurrency: 2))
+        XCTAssertEqual(config.extraction, .contentOnly)
+        XCTAssertTrue(config.linkedPDFDownloadDirectory?.path.hasSuffix("/downloads") == true)
+    }
+
     func testDownloadPDFsCannotCombineWithPDFGeneration() {
         XCTAssertThrowsError(
             try CLIParser.parse(arguments: [
@@ -690,6 +764,20 @@ final class CLIParserTests: XCTestCase {
             XCTAssertEqual(
                 error as? ScraperError,
                 .invalidArgument("`--pdf` と `--download-pdfs` は同時に指定できません")
+            )
+        }
+    }
+
+    func testDownloadLinkedPDFsCannotCombineWithPDFGeneration() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "--pdf", "notes.md",
+                "--download-linked-pdfs", "downloads",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--pdf` と `--download-linked-pdfs` は同時に指定できません")
             )
         }
     }
@@ -706,17 +794,33 @@ final class CLIParserTests: XCTestCase {
         }
     }
 
-    func testDownloadPDFsRejectsBatchMode() {
+    func testDownloadPDFsBatchRejectsCookieJar() {
         XCTAssertThrowsError(
             try CLIParser.parse(arguments: [
                 "https://example.com",
                 "--download-pdfs", "downloads",
                 "--sitemap",
+                "--cookie-jar", "cookies.json",
             ])
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--download-pdfs` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+                .invalidArgument("`--cookie-jar` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+            )
+        }
+    }
+
+    func testDownloadModesCannotBeCombined() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--download-pdfs", "downloads",
+                "--download-linked-pdfs", "linked-downloads",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--download-pdfs` と `--download-linked-pdfs` は同時に指定できません")
             )
         }
     }

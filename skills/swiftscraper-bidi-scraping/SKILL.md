@@ -17,7 +17,7 @@ Use this skill when the task involves:
 - Waiting for SPA or dynamic content before extraction.
 - Using `swiftScraper:scrape.extract`, `waitForSelector`, `autoScroll`, cookies, screenshots, or JavaScript evaluation.
 
-For a one-shot task that downloads PDFs from a rendered link-list page, use the `swiftscraper-pdf-download` skill and prefer the CLI mode instead of the BiDi server:
+For a task that downloads PDFs from rendered pages, use the `swiftscraper-pdf-download` skill and prefer the CLI mode instead of the BiDi server:
 
 ```bash
 swift run swift-scraper -- \
@@ -27,6 +27,8 @@ swift run swift-scraper -- \
 ```
 
 This saves files under `downloads/<host>/<source-path>/` and names each file as `<link text up to 30 chars>-<original filename>`. BiDi server mode still does not implement browser download control.
+
+If normal scrape output is also needed, use `--download-linked-pdfs <dir>` in the CLI workflow; it writes the PDF manifest to `<dir>/pdf-downloads.json`.
 
 ## Start The Server
 

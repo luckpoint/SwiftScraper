@@ -192,6 +192,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
     public let outputFormat: OutputFormat
     public let extraction: ExtractionMode
     public let imageExtraction: ImageExtractionConfiguration
+    public let linkedPDFDownloadDirectory: URL?
     public let prettyPrint: Bool
     public let verbose: Bool
 
@@ -210,6 +211,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
         outputFormat: OutputFormat = .plain,
         extraction: ExtractionMode,
         imageExtraction: ImageExtractionConfiguration = .disabled,
+        linkedPDFDownloadDirectory: URL? = nil,
         prettyPrint: Bool,
         verbose: Bool
     ) {
@@ -227,6 +229,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
         self.outputFormat = outputFormat
         self.extraction = extraction
         self.imageExtraction = imageExtraction
+        self.linkedPDFDownloadDirectory = linkedPDFDownloadDirectory
         self.prettyPrint = prettyPrint
         self.verbose = verbose
     }
@@ -249,6 +252,7 @@ extension ScraperConfiguration {
             outputFormat: outputFormat,
             extraction: extraction,
             imageExtraction: imageExtraction,
+            linkedPDFDownloadDirectory: linkedPDFDownloadDirectory,
             prettyPrint: prettyPrint,
             verbose: verbose
         )
@@ -278,6 +282,7 @@ public struct PDFDownloadConfiguration: Equatable, Sendable {
     public let viewport: Viewport
     public let wait: WaitConfiguration
     public let timeouts: Timeouts
+    public let batch: BatchMode?
     public let verbose: Bool
 
     public init(
@@ -291,6 +296,7 @@ public struct PDFDownloadConfiguration: Equatable, Sendable {
         viewport: Viewport,
         wait: WaitConfiguration,
         timeouts: Timeouts,
+        batch: BatchMode? = nil,
         verbose: Bool
     ) {
         self.url = url
@@ -303,6 +309,7 @@ public struct PDFDownloadConfiguration: Equatable, Sendable {
         self.viewport = viewport
         self.wait = wait
         self.timeouts = timeouts
+        self.batch = batch
         self.verbose = verbose
     }
 }

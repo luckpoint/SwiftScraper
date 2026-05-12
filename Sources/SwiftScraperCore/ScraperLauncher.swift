@@ -6,6 +6,11 @@ private struct LaunchResult {
     let exitCode: Int32
 }
 
+private struct BatchPageWorkResult {
+    let page: BatchRunResult.Page
+    let pdfPage: PDFDownloadBatchRunResult.Page?
+}
+
 private struct ResolvedBatchSource {
     let kind: String
     let location: String
@@ -118,15 +123,30 @@ public final class ScraperLauncher {
 
     private func makeSinglePageLaunchResult(configuration: ScraperConfiguration) async throws -> LaunchResult {
         let scraper = WebScraper(configuration: configuration, logger: logger)
-        let output = try await scraper.run()
+        let scrapeResult: WebScraperRunResult
+        if configuration.linkedPDFDownloadDirectory != nil {
+            scrapeResult = try await scraper.runWithPDFLinks()
+        } else {
+            scrapeResult = WebScraperRunResult(output: try await scraper.run(), pdfLinks: nil)
+        }
+
         let formattedOutput = try OutputFormatter.format(
-            output,
+            scrapeResult.output,
             sourceURL: configuration.url,
             extraction: configuration.extraction,
             outputFormat: configuration.outputFormat,
             prettyPrint: configuration.prettyPrint
         )
-        return LaunchResult(output: formattedOutput, exitCode: 0)
+
+        let pdfExitCode = try await saveLinkedPDFManifestIfNeeded(
+            sourceKind: "single",
+            sourceLocation: configuration.url.absoluteString,
+            sourceURL: configuration.url,
+            pdfLinks: scrapeResult.pdfLinks,
+            configuration: configuration
+        )
+
+        return LaunchResult(output: formattedOutput, exitCode: pdfExitCode)
     }
 
     private func makeBatchLaunchResult(_ batchMode: BatchMode) async throws -> LaunchResult {
@@ -138,33 +158,42 @@ public final class ScraperLauncher {
         let baseConfiguration = configuration
         let logger = self.logger
 
-        let pages = await withTaskGroup(of: (Int, BatchRunResult.Page).self, returning: [BatchRunResult.Page].self) { group in
+        let workResults = await withTaskGroup(
+            of: (Int, BatchPageWorkResult).self,
+            returning: [BatchPageWorkResult].self
+        ) { group in
             for (index, url) in resolved.pageURLs.enumerated() {
                 group.addTask {
-                    let page = await limiter.withPermit {
+                    let result = await limiter.withPermit {
                         await ScraperLauncher.scrapeBatchPage(
                             url: url,
                             baseConfiguration: baseConfiguration,
                             logger: logger
                         )
                     }
-                    return (index, page)
+                    return (index, result)
                 }
             }
 
-            var indexedPages: [(Int, BatchRunResult.Page)] = []
-            for await indexedPage in group {
-                indexedPages.append(indexedPage)
+            var indexedResults: [(Int, BatchPageWorkResult)] = []
+            for await indexedResult in group {
+                indexedResults.append(indexedResult)
             }
 
-            return indexedPages
+            return indexedResults
                 .sorted { $0.0 < $1.0 }
                 .map(\.1)
         }
 
+        let pages = workResults.map(\.page)
         let batchResult = BatchRunResult(sourceKind: resolved.kind, sourceLocation: resolved.location, pages: pages)
+        let pdfExitCode = try saveLinkedPDFBatchManifestIfNeeded(
+            sourceKind: resolved.kind,
+            sourceLocation: resolved.location,
+            pdfPages: workResults.compactMap(\.pdfPage)
+        )
         let output = try BatchRunFormatter.format(batchResult)
-        let exitCode: Int32 = batchResult.failureCount > 0 ? 1 : 0
+        let exitCode: Int32 = batchResult.failureCount > 0 || pdfExitCode != 0 ? 1 : 0
         return LaunchResult(output: output, exitCode: exitCode)
     }
 
@@ -192,25 +221,136 @@ public final class ScraperLauncher {
         url: URL,
         baseConfiguration: ScraperConfiguration,
         logger: StderrLogger
-    ) async -> BatchRunResult.Page {
+    ) async -> BatchPageWorkResult {
         let pageConfiguration = baseConfiguration.replacing(url: url, batch: nil)
         logger.info("batch page start: \(url.absoluteString)")
 
         do {
             let scraper = WebScraper(configuration: pageConfiguration, logger: logger)
-            let output = try await scraper.run()
+            let scrapeResult: WebScraperRunResult
+            if pageConfiguration.linkedPDFDownloadDirectory != nil {
+                scrapeResult = try await scraper.runWithPDFLinks()
+            } else {
+                scrapeResult = WebScraperRunResult(output: try await scraper.run(), pdfLinks: nil)
+            }
+
             let formattedOutput = try OutputFormatter.format(
-                output,
+                scrapeResult.output,
                 sourceURL: pageConfiguration.url,
                 extraction: pageConfiguration.extraction,
                 outputFormat: pageConfiguration.outputFormat,
                 prettyPrint: pageConfiguration.prettyPrint
             )
+            let pdfPage = await saveLinkedPDFsIfNeeded(
+                sourceURL: pageConfiguration.url,
+                pdfLinks: scrapeResult.pdfLinks,
+                configuration: pageConfiguration,
+                logger: logger
+            )
             logger.info("batch page done: \(url.absoluteString)")
-            return .succeeded(url: url, output: formattedOutput)
+            return BatchPageWorkResult(page: .succeeded(url: url, output: formattedOutput), pdfPage: pdfPage)
         } catch {
             logger.info("batch page failed: \(url.absoluteString): \(error.localizedDescription)")
-            return .failed(url: url, error: error.localizedDescription)
+            let pdfPage: PDFDownloadBatchRunResult.Page?
+            if pageConfiguration.linkedPDFDownloadDirectory != nil {
+                pdfPage = .failed(url: url, error: error.localizedDescription)
+            } else {
+                pdfPage = nil
+            }
+            return BatchPageWorkResult(page: .failed(url: url, error: error.localizedDescription), pdfPage: pdfPage)
+        }
+    }
+
+    private func saveLinkedPDFManifestIfNeeded(
+        sourceKind: String,
+        sourceLocation: String,
+        sourceURL: URL,
+        pdfLinks: PDFLinkCollection?,
+        configuration: ScraperConfiguration
+    ) async throws -> Int32 {
+        guard configuration.linkedPDFDownloadDirectory != nil else {
+            return 0
+        }
+
+        let pdfPage = await Self.saveLinkedPDFsIfNeeded(
+            sourceURL: sourceURL,
+            pdfLinks: pdfLinks,
+            configuration: configuration,
+            logger: logger
+        ) ?? .failed(url: sourceURL, error: "PDF リンク収集結果がありません")
+
+        let result = PDFDownloadBatchRunResult(
+            sourceKind: sourceKind,
+            sourceLocation: sourceLocation,
+            outputDirectory: configuration.linkedPDFDownloadDirectory!,
+            pages: [pdfPage]
+        )
+        try writeLinkedPDFManifest(result, to: configuration.linkedPDFDownloadDirectory!)
+        return result.hasFailures ? 1 : 0
+    }
+
+    private func saveLinkedPDFBatchManifestIfNeeded(
+        sourceKind: String,
+        sourceLocation: String,
+        pdfPages: [PDFDownloadBatchRunResult.Page]
+    ) throws -> Int32 {
+        guard let outputDirectory = configuration.linkedPDFDownloadDirectory else {
+            return 0
+        }
+
+        let result = PDFDownloadBatchRunResult(
+            sourceKind: sourceKind,
+            sourceLocation: sourceLocation,
+            outputDirectory: outputDirectory,
+            pages: pdfPages
+        )
+        try writeLinkedPDFManifest(result, to: outputDirectory)
+        return result.hasFailures ? 1 : 0
+    }
+
+    private static func saveLinkedPDFsIfNeeded(
+        sourceURL: URL,
+        pdfLinks: PDFLinkCollection?,
+        configuration: ScraperConfiguration,
+        logger: StderrLogger
+    ) async -> PDFDownloadBatchRunResult.Page? {
+        guard let outputDirectory = configuration.linkedPDFDownloadDirectory else {
+            return nil
+        }
+
+        guard let pdfLinks else {
+            return .failed(url: sourceURL, error: "PDF リンク収集結果がありません")
+        }
+
+        do {
+            let saver = PDFDownloadSaver(
+                outputDirectory: outputDirectory,
+                timeout: configuration.timeouts.load,
+                customHeaders: configuration.customHeaders,
+                logger: logger
+            )
+            let result = try await saver.save(pdfLinks)
+            return .succeeded(result)
+        } catch {
+            return .failed(url: sourceURL, error: error.localizedDescription)
+        }
+    }
+
+    private func writeLinkedPDFManifest(_ result: PDFDownloadBatchRunResult, to outputDirectory: URL) throws {
+        let manifestURL = outputDirectory.appendingPathComponent("pdf-downloads.json", isDirectory: false)
+        do {
+            try FileManager.default.createDirectory(
+                at: outputDirectory,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+            let json = try PDFDownloadFormatter.format(result)
+            try json.write(to: manifestURL, atomically: true, encoding: .utf8)
+            logger.info("PDF ダウンロード結果を保存しました: \(manifestURL.path)")
+        } catch let error as ScraperError {
+            throw error
+        } catch {
+            throw ScraperError.outputFailed("\(manifestURL.path): \(error.localizedDescription)")
         }
     }
 

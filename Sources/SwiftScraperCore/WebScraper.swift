@@ -2,6 +2,16 @@ import AppKit
 import Foundation
 import WebKit
 
+public struct WebScraperRunResult: Equatable, Sendable {
+    public let output: String
+    public let pdfLinks: PDFLinkCollection?
+
+    public init(output: String, pdfLinks: PDFLinkCollection?) {
+        self.output = output
+        self.pdfLinks = pdfLinks
+    }
+}
+
 @MainActor
 public final class WebScraper: NSObject {
     private let configuration: ScraperConfiguration
@@ -43,6 +53,14 @@ public final class WebScraper: NSObject {
     }
 
     public func run() async throws -> String {
+        try await runWithOptionalPDFLinks(collectPDFLinks: false).output
+    }
+
+    public func runWithPDFLinks() async throws -> WebScraperRunResult {
+        try await runWithOptionalPDFLinks(collectPDFLinks: true)
+    }
+
+    private func runWithOptionalPDFLinks(collectPDFLinks: Bool) async throws -> WebScraperRunResult {
         logger.info("開始 URL: \(configuration.url.absoluteString)")
         logger.info("DataStore: \(configuration.dataStoreMode.rawValue), visibility: \(configuration.visibility.rawValue)")
 
@@ -55,8 +73,21 @@ public final class WebScraper: NSObject {
         try await loadPage()
         try await waitForRenderIfNeeded()
         let output = try await extract()
+        let pdfLinks: PDFLinkCollection?
+        if collectPDFLinks {
+            let payload = try await evaluatePDFLinkPayload()
+            let cookies = await currentCookieDefinitions()
+            pdfLinks = PDFLinkCollection(
+                sourceURL: webView.url ?? configuration.url,
+                links: payload.links,
+                userAgent: payload.normalizedUserAgent,
+                cookies: cookies
+            )
+        } else {
+            pdfLinks = nil
+        }
         try await saveCookieJarIfNeeded()
-        return output
+        return WebScraperRunResult(output: output, pdfLinks: pdfLinks)
     }
 
     public func collectPDFLinks() async throws -> PDFLinkCollection {

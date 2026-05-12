@@ -1,17 +1,17 @@
 ---
 name: swiftscraper-pdf-download
-description: Use this skill when the user wants SwiftScraper to download PDF files from a rendered PDF link-list page. This skill covers the `--download-pdfs` CLI mode, WKWebView DOM-based PDF link discovery, site/path-based output directories, link-text-derived filenames, User-Agent and Cookie propagation from WKWebView to URLSession, and troubleshooting PDF download failures.
+description: Use this skill when the user wants SwiftScraper to download PDF files from rendered pages, including single PDF link-list pages, sitemap or URL-file batches, and normal scraping with linked PDF sidecar downloads. This skill covers `--download-pdfs`, `--download-linked-pdfs`, WKWebView DOM-based PDF link discovery, site/path-based output directories, link-text-derived filenames, User-Agent and Cookie propagation from WKWebView to URLSession, and troubleshooting PDF download failures.
 ---
 
 # SwiftScraper PDF Download
 
-Use this skill for one-shot PDF downloads from pages that list PDF links, such as legal, trust, compliance, or documentation pages.
+Use this skill when SwiftScraper should save PDF files linked from rendered pages, such as legal, trust, compliance, documentation, or support pages.
 
 This is a CLI workflow, not a WebDriver BiDi browser download workflow.
 
-## Command
+## Choose The Mode
 
-From the SwiftScraper repository root:
+Use `--download-pdfs <dir>` when the user wants PDF files only:
 
 ```bash
 swift run swift-scraper -- \
@@ -19,6 +19,38 @@ swift run swift-scraper -- \
   --download-pdfs downloads \
   --auto-scroll
 ```
+
+Use `--download-pdfs <dir>` with batch inputs when the user wants PDF files from multiple pages and does not need normal scrape output:
+
+```bash
+swift run swift-scraper -- \
+  https://example.com \
+  --sitemap \
+  --download-pdfs downloads \
+  --concurrency 4
+```
+
+```bash
+swift run swift-scraper -- \
+  --url-file urls.txt \
+  --download-pdfs downloads \
+  --concurrency 4
+```
+
+Use `--download-linked-pdfs <dir>` when the user wants normal scrape output and PDF files as a sidecar:
+
+```bash
+swift run swift-scraper -- \
+  https://example.com/docs \
+  --content-only \
+  --markdown \
+  --download-linked-pdfs downloads \
+  --output out/docs.md
+```
+
+This also works with `--sitemap` and `--url-file`; the normal batch JSON remains stdout or `--output`, and the PDF manifest is written to `<dir>/pdf-downloads.json`.
+
+## Rendering Helpers
 
 Use the same rendering helpers as normal scraping when needed:
 
@@ -32,6 +64,8 @@ swift run swift-scraper -- \
   --header "Accept-Language: en-US,en;q=0.9"
 ```
 
+For single-page runs, `--cookie-jar` may be used. For `--sitemap` and `--url-file` batch runs, `--cookie-jar` is rejected.
+
 ## How Links Are Found
 
 SwiftScraper loads the page in WKWebView, applies cookies/headers, waits for rendering, then evaluates JavaScript against the rendered DOM.
@@ -42,7 +76,9 @@ The extraction script scans:
 document.querySelectorAll('a[href]')
 ```
 
-It keeps links whose resolved URL uses `http:`, `https:`, or `file:` and whose path ends with `.pdf` case-insensitively. It also deduplicates exact PDF URLs after removing fragments.
+It keeps links whose resolved URL uses `http:`, `https:`, or `file:` and whose path ends with `.pdf` case-insensitively. It deduplicates exact PDF URLs after removing fragments.
+
+For `--download-linked-pdfs`, SwiftScraper does not load the page twice. It collects PDF links during the same WKWebView run used for normal scraping.
 
 ## Output Layout
 
@@ -61,6 +97,8 @@ downloads/
       trustandcompliance/
         Report-report.pdf
 ```
+
+This layout is the source attribution: the host and source page path show which page produced the PDF links.
 
 ## Filename Rules
 
@@ -91,7 +129,9 @@ This makes the PDF request closely match the rendered page context without relyi
 
 ## Output JSON
 
-The command writes a JSON summary to stdout. Check:
+`--download-pdfs` writes its JSON summary to stdout.
+
+For single-page runs, check:
 
 - `source.url`
 - `source.directory`
@@ -102,6 +142,19 @@ The command writes a JSON summary to stdout. Check:
 - `files[].outputPath`
 - `files[].error`
 
+For batch runs and `--download-linked-pdfs`, check:
+
+- `source.kind`
+- `source.location`
+- `pageCount`
+- `pageSuccessCount`
+- `pageFailureCount`
+- `pages[].url`
+- `pages[].sourceDirectory`
+- `pages[].files[]`
+
+`--download-linked-pdfs` writes this batch-shaped manifest to `<download-dir>/pdf-downloads.json`.
+
 Exit codes:
 
 - `0`: page processing succeeded and all discovered PDFs downloaded, or no PDF links were found
@@ -110,7 +163,7 @@ Exit codes:
 
 ## Limitations
 
-- Single-page mode only. `--sitemap` and `--url-file` are not supported with `--download-pdfs`.
 - Only links whose URL path ends with `.pdf` are included.
 - Download endpoints that redirect to PDFs but do not end in `.pdf` are not included.
 - Response `Content-Type` is not validated; any 2xx response for a discovered PDF URL is saved.
+- BiDi server mode is separate; do not use this skill for browser download control through WebDriver BiDi.

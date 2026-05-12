@@ -88,8 +88,86 @@ struct PDFDownloadRunResult: Codable, Equatable, Sendable {
     }
 }
 
+struct PDFDownloadBatchRunResult: Codable, Equatable, Sendable {
+    struct Source: Codable, Equatable, Sendable {
+        let kind: String
+        let location: String
+    }
+
+    struct Page: Codable, Equatable, Sendable {
+        let url: String
+        let sourceDirectory: String?
+        let success: Bool
+        let pdfCount: Int
+        let successCount: Int
+        let failureCount: Int
+        let files: [PDFDownloadRunResult.File]
+        let error: String?
+
+        static func succeeded(_ result: PDFDownloadRunResult) -> Self {
+            Self(
+                url: result.source.url,
+                sourceDirectory: result.source.directory,
+                success: result.failureCount == 0,
+                pdfCount: result.pdfCount,
+                successCount: result.successCount,
+                failureCount: result.failureCount,
+                files: result.files,
+                error: nil
+            )
+        }
+
+        static func failed(url: URL, error: String) -> Self {
+            Self(
+                url: url.absoluteString,
+                sourceDirectory: nil,
+                success: false,
+                pdfCount: 0,
+                successCount: 0,
+                failureCount: 0,
+                files: [],
+                error: error
+            )
+        }
+    }
+
+    let source: Source
+    let outputDirectory: String
+    let pageCount: Int
+    let pageSuccessCount: Int
+    let pageFailureCount: Int
+    let pdfCount: Int
+    let successCount: Int
+    let failureCount: Int
+    let pages: [Page]
+
+    init(sourceKind: String, sourceLocation: String, outputDirectory: URL, pages: [Page]) {
+        self.source = Source(kind: sourceKind, location: sourceLocation)
+        self.outputDirectory = outputDirectory.path
+        self.pageCount = pages.count
+        self.pageSuccessCount = pages.filter(\.success).count
+        self.pageFailureCount = pages.count - self.pageSuccessCount
+        self.pdfCount = pages.reduce(0) { $0 + $1.pdfCount }
+        self.successCount = pages.reduce(0) { $0 + $1.successCount }
+        self.failureCount = pages.reduce(0) { $0 + $1.failureCount }
+        self.pages = pages
+    }
+
+    var hasFailures: Bool {
+        pageFailureCount > 0 || failureCount > 0
+    }
+}
+
 enum PDFDownloadFormatter {
     static func format(_ result: PDFDownloadRunResult) throws -> String {
+        try encode(result)
+    }
+
+    static func format(_ result: PDFDownloadBatchRunResult) throws -> String {
+        try encode(result)
+    }
+
+    private static func encode(_ result: some Encodable) throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
 
@@ -267,56 +345,16 @@ enum PDFDownloadRequestBuilder {
     }
 }
 
-@MainActor
-public final class PDFDownloadLauncher {
-    private let configuration: PDFDownloadConfiguration
-    private let logger: StderrLogger
-    private var exitCode: Int32 = 0
-    private var runLoop: CFRunLoop?
+struct PDFDownloadSaver {
+    let outputDirectory: URL
+    let timeout: TimeInterval
+    let customHeaders: [String: String]
+    let logger: StderrLogger
 
-    public init(configuration: PDFDownloadConfiguration) {
-        self.configuration = configuration
-        self.logger = StderrLogger(verbose: configuration.verbose)
-    }
-
-    public func run() -> Int32 {
-        let application = NSApplication.shared
-        _ = application.setActivationPolicy(configuration.visibility.activationPolicy)
-        application.finishLaunching()
-        runLoop = CFRunLoopGetCurrent()
-
-        if let runLoop {
-            CFRunLoopPerformBlock(runLoop, CFRunLoopMode.defaultMode.rawValue) { [self] in
-                Task { @MainActor in
-                    await self.execute()
-                    self.stopApplicationLoop()
-                }
-            }
-            CFRunLoopWakeUp(runLoop)
-        }
-
-        CFRunLoopRun()
-        return exitCode
-    }
-
-    private func execute() async {
-        do {
-            let result = try await makeRunResult()
-            let output = try PDFDownloadFormatter.format(result)
-            write(output, to: FileHandle.standardOutput)
-            exitCode = result.failureCount > 0 ? 1 : 0
-        } catch {
-            exitCode = 1
-            logger.error(error.localizedDescription)
-        }
-    }
-
-    private func makeRunResult() async throws -> PDFDownloadRunResult {
-        let scraper = WebScraper(configuration: scraperConfiguration(), logger: logger)
-        let collection = try await scraper.collectPDFLinks()
+    func save(_ collection: PDFLinkCollection) async throws -> PDFDownloadRunResult {
         let sourceDirectory = PDFDownloadFileNaming.sourceDirectory(
             for: collection.sourceURL,
-            under: configuration.outputDirectory
+            under: outputDirectory
         )
 
         do {
@@ -371,29 +409,8 @@ public final class PDFDownloadLauncher {
         return PDFDownloadRunResult(
             sourceURL: collection.sourceURL,
             sourceDirectory: sourceDirectory,
-            outputDirectory: configuration.outputDirectory,
+            outputDirectory: outputDirectory,
             files: files
-        )
-    }
-
-    private func scraperConfiguration() -> ScraperConfiguration {
-        ScraperConfiguration(
-            url: configuration.url,
-            cookies: configuration.cookies,
-            cookieJar: configuration.cookieJar,
-            customHeaders: configuration.customHeaders,
-            dataStoreMode: configuration.dataStoreMode,
-            visibility: configuration.visibility,
-            viewport: configuration.viewport,
-            wait: configuration.wait,
-            timeouts: configuration.timeouts,
-            batch: nil,
-            output: .stdout,
-            outputFormat: .plain,
-            extraction: .outerHTML,
-            imageExtraction: .disabled,
-            prettyPrint: false,
-            verbose: configuration.verbose
         )
     }
 
@@ -410,8 +427,8 @@ public final class PDFDownloadLauncher {
 
         let request = PDFDownloadRequestBuilder.makeRequest(
             url: url,
-            timeout: configuration.timeouts.load,
-            customHeaders: configuration.customHeaders,
+            timeout: timeout,
+            customHeaders: customHeaders,
             cookies: cookies,
             userAgent: userAgent
         )
@@ -434,8 +451,228 @@ public final class PDFDownloadLauncher {
             throw ScraperError.pdfDownloadFailed("\(outputURL.path): \(error.localizedDescription)")
         }
     }
+}
 
-    private func write(_ text: String, to handle: FileHandle) {
+@MainActor
+public final class PDFDownloadLauncher {
+    private let configuration: PDFDownloadConfiguration
+    private let logger: StderrLogger
+    private var exitCode: Int32 = 0
+    private var runLoop: CFRunLoop?
+
+    private struct LaunchResult {
+        let output: String
+        let exitCode: Int32
+    }
+
+    private struct ResolvedBatchSource {
+        let kind: String
+        let location: String
+        let pageURLs: [URL]
+    }
+
+    public init(configuration: PDFDownloadConfiguration) {
+        self.configuration = configuration
+        self.logger = StderrLogger(verbose: configuration.verbose)
+    }
+
+    public func run() -> Int32 {
+        let application = NSApplication.shared
+        _ = application.setActivationPolicy(configuration.visibility.activationPolicy)
+        application.finishLaunching()
+        runLoop = CFRunLoopGetCurrent()
+
+        if let runLoop {
+            CFRunLoopPerformBlock(runLoop, CFRunLoopMode.defaultMode.rawValue) { [self] in
+                Task { @MainActor in
+                    await self.execute()
+                    self.stopApplicationLoop()
+                }
+            }
+            CFRunLoopWakeUp(runLoop)
+        }
+
+        CFRunLoopRun()
+        return exitCode
+    }
+
+    private func execute() async {
+        do {
+            let result = try await makeLaunchResult()
+            write(result.output, to: FileHandle.standardOutput)
+            exitCode = result.exitCode
+        } catch {
+            exitCode = 1
+            logger.error(error.localizedDescription)
+        }
+    }
+
+    private func makeLaunchResult() async throws -> LaunchResult {
+        if let batch = configuration.batch {
+            let result = try await makeBatchRunResult(batch)
+            return LaunchResult(
+                output: try PDFDownloadFormatter.format(result),
+                exitCode: result.hasFailures ? 1 : 0
+            )
+        }
+
+        let result = try await makeSingleRunResult(url: configuration.url)
+        return LaunchResult(
+            output: try PDFDownloadFormatter.format(result),
+            exitCode: result.failureCount > 0 ? 1 : 0
+        )
+    }
+
+    private func makeSingleRunResult(url: URL) async throws -> PDFDownloadRunResult {
+        let scraper = WebScraper(configuration: scraperConfiguration(url: url), logger: logger)
+        let collection = try await scraper.collectPDFLinks()
+        return try await makeSaver().save(collection)
+    }
+
+    private func makeBatchRunResult(_ batchMode: BatchMode) async throws -> PDFDownloadBatchRunResult {
+        let resolved = try await resolveBatchSource(batchMode)
+        logger.info("\(resolved.kind) から \(resolved.pageURLs.count) 件の URL を解決しました")
+
+        let concurrency = min(batchMode.concurrency, max(resolved.pageURLs.count, 1))
+        let limiter = AsyncSemaphore(limit: concurrency)
+        let baseConfiguration = configuration
+        let logger = self.logger
+
+        let pages = await withTaskGroup(
+            of: (Int, PDFDownloadBatchRunResult.Page).self,
+            returning: [PDFDownloadBatchRunResult.Page].self
+        ) { group in
+            for (index, url) in resolved.pageURLs.enumerated() {
+                group.addTask {
+                    let page = await limiter.withPermit {
+                        await PDFDownloadLauncher.downloadBatchPage(
+                            url: url,
+                            baseConfiguration: baseConfiguration,
+                            logger: logger
+                        )
+                    }
+                    return (index, page)
+                }
+            }
+
+            var indexedPages: [(Int, PDFDownloadBatchRunResult.Page)] = []
+            for await indexedPage in group {
+                indexedPages.append(indexedPage)
+            }
+
+            return indexedPages
+                .sorted { $0.0 < $1.0 }
+                .map(\.1)
+        }
+
+        return PDFDownloadBatchRunResult(
+            sourceKind: resolved.kind,
+            sourceLocation: resolved.location,
+            outputDirectory: configuration.outputDirectory,
+            pages: pages
+        )
+    }
+
+    private func resolveBatchSource(_ batchMode: BatchMode) async throws -> ResolvedBatchSource {
+        switch batchMode.input {
+        case .sitemap:
+            let resolver = SitemapResolver(timeout: configuration.timeouts.load, logger: logger)
+            let resolved = try await resolver.resolve(startingFrom: configuration.url)
+            return ResolvedBatchSource(
+                kind: "sitemap",
+                location: resolved.sitemapURL.absoluteString,
+                pageURLs: resolved.pageURLs
+            )
+        case .urlFile(let fileURL):
+            let resolved = try URLFileResolver.resolve(from: fileURL)
+            return ResolvedBatchSource(
+                kind: "url-file",
+                location: fileURL.path,
+                pageURLs: resolved.pageURLs
+            )
+        }
+    }
+
+    private static func downloadBatchPage(
+        url: URL,
+        baseConfiguration: PDFDownloadConfiguration,
+        logger: StderrLogger
+    ) async -> PDFDownloadBatchRunResult.Page {
+        logger.info("PDF batch page start: \(url.absoluteString)")
+
+        do {
+            let pageConfiguration = baseConfiguration.replacing(url: url, batch: nil)
+            let scraper = WebScraper(configuration: pageConfiguration.scraperConfiguration(), logger: logger)
+            let collection = try await scraper.collectPDFLinks()
+            let result = try await pageConfiguration.makeSaver(logger: logger).save(collection)
+            logger.info("PDF batch page done: \(url.absoluteString)")
+            return .succeeded(result)
+        } catch {
+            logger.info("PDF batch page failed: \(url.absoluteString): \(error.localizedDescription)")
+            return .failed(url: url, error: error.localizedDescription)
+        }
+    }
+
+    private func scraperConfiguration(url: URL) -> ScraperConfiguration {
+        configuration.replacing(url: url, batch: nil).scraperConfiguration()
+    }
+
+    private func makeSaver() -> PDFDownloadSaver {
+        configuration.makeSaver(logger: logger)
+    }
+}
+
+extension PDFDownloadConfiguration {
+    func replacing(url: URL, batch: BatchMode?) -> PDFDownloadConfiguration {
+        PDFDownloadConfiguration(
+            url: url,
+            outputDirectory: outputDirectory,
+            cookies: cookies,
+            cookieJar: cookieJar,
+            customHeaders: customHeaders,
+            dataStoreMode: dataStoreMode,
+            visibility: visibility,
+            viewport: viewport,
+            wait: wait,
+            timeouts: timeouts,
+            batch: batch,
+            verbose: verbose
+        )
+    }
+
+    func scraperConfiguration() -> ScraperConfiguration {
+        ScraperConfiguration(
+            url: url,
+            cookies: cookies,
+            cookieJar: cookieJar,
+            customHeaders: customHeaders,
+            dataStoreMode: dataStoreMode,
+            visibility: visibility,
+            viewport: viewport,
+            wait: wait,
+            timeouts: timeouts,
+            batch: nil,
+            output: .stdout,
+            outputFormat: .plain,
+            extraction: .outerHTML,
+            imageExtraction: .disabled,
+            prettyPrint: false,
+            verbose: verbose
+        )
+    }
+
+    func makeSaver(logger: StderrLogger) -> PDFDownloadSaver {
+        PDFDownloadSaver(
+            outputDirectory: outputDirectory,
+            timeout: timeouts.load,
+            customHeaders: customHeaders,
+            logger: logger
+        )
+    }
+}
+
+private extension PDFDownloadLauncher {
+    func write(_ text: String, to handle: FileHandle) {
         var output = text
         if !output.hasSuffix("\n") {
             output.append("\n")
@@ -444,7 +681,7 @@ public final class PDFDownloadLauncher {
         handle.write(Data(output.utf8))
     }
 
-    private func stopApplicationLoop() {
+    func stopApplicationLoop() {
         if let runLoop {
             CFRunLoopStop(runLoop)
         }

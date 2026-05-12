@@ -129,6 +129,7 @@ BiDi server は長時間起動する操作モードなので、通常の 1 shot 
 
 - `--pdf`
 - `--download-pdfs`
+- `--download-linked-pdfs`
 - `--sitemap`
 - `--url-file`
 - `--concurrency`

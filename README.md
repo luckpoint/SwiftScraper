@@ -70,6 +70,7 @@ swift run swift-scraper -- https://example.com
 --wait-timeout <seconds>       描画待機タイムアウト。既定 15
 --js-timeout <seconds>         JavaScript 実行タイムアウト。既定 10
 --download-pdfs <directory>    ページ内の PDF リンクを保存
+--download-linked-pdfs <dir>   通常抽出と同時にページ内の PDF リンクを保存
 --output <path>                標準出力ではなくファイルへ保存
 --body-text                    document.body.innerText を抽出
 --selector-inner-html <css>    特定要素の innerHTML を抽出
@@ -146,6 +147,27 @@ Okta Model Card Governance Ana-okta-model-card-governance-analyzer-2026-02-13.pd
 実行結果は stdout に JSON で出力され、保存先、成功件数、失敗件数、各 PDF の URL と保存パスを確認できます。`--cookie` / `--cookie-file` / `--cookie-jar` / `--header` / 待機系オプションは PDF リンク抽出にも利用できます。
 
 PDF 本体のダウンロードは `URLSession` で行います。Cookie は描画後の `WKWebsiteDataStore.httpCookieStore` から取得し、PDF URL に合うものを `Cookie` ヘッダーへ反映します。`User-Agent` は `--header 'User-Agent: ...'` があればその値を優先し、未指定の場合は WKWebView 内の `navigator.userAgent` を取得して PDF ダウンロード request に設定します。
+
+`--download-pdfs` は `--sitemap` / `--url-file` と併用できます。各ページを描画して PDF リンクだけを保存し、batch の PDF ダウンロード結果 JSON を stdout へ出力します。
+
+```bash
+swift run swift-scraper -- \
+  https://example.com \
+  --sitemap \
+  --download-pdfs downloads \
+  --concurrency 4
+```
+
+通常の抽出結果も欲しい場合は `--download-linked-pdfs <dir>` を使います。通常 scrape の stdout / `--output` はそのまま維持し、PDF ダウンロード結果は `<dir>/pdf-downloads.json` に保存します。
+
+```bash
+swift run swift-scraper -- \
+  https://example.com/docs \
+  --content-only \
+  --markdown \
+  --download-linked-pdfs downloads \
+  --output out/docs.md
+```
 
 ### 6. Cookie を直接注入する
 ```bash
@@ -346,5 +368,5 @@ batch 実行時の最終出力は JSON です。各ページの成功 / 失敗�
 - gzip 圧縮された sitemap (`.xml.gz`) は URL 判定のみ対応で、中身の展開は未対応です
 - `windowless` / `hidden-window` は露出を抑えるためのモードで、完全 headless を保証するものではありません
 - 画像 heuristic の初期実装はページ単位判定までです。batch 頻度補正やドメイン別 blacklist は未実装です
-- `--download-pdfs` は単一ページの PDF リンク集を対象とし、`--sitemap` / `--url-file` との batch 実行は未対応です
+- `--download-pdfs` / `--download-linked-pdfs` は `href` の path が `.pdf` で終わるリンクだけを対象にします
 - WebDriver BiDi bridge は scraping 用 subset であり、WebDriver BiDi 仕様の完全実装ではありません

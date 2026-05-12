@@ -91,6 +91,41 @@ final class PDFDownloadFormatterTests: XCTestCase {
         XCTAssertEqual(decoded.files[0].pdfURL, "https://example.com/report.pdf")
         XCTAssertEqual(decoded.files[0].outputPath, "/tmp/downloads/example.com/report.pdf")
     }
+
+    func testFormatEncodesBatchDownloadResultAsJSON() throws {
+        let link = PDFLinkCandidate(url: URL(string: "https://example.com/report.pdf")!, text: "Report")
+        let outputURL = URL(fileURLWithPath: "/tmp/downloads/example.com/legal/report.pdf")
+        let pageResult = PDFDownloadRunResult(
+            sourceURL: URL(string: "https://example.com/legal/")!,
+            sourceDirectory: URL(fileURLWithPath: "/tmp/downloads/example.com/legal"),
+            outputDirectory: URL(fileURLWithPath: "/tmp/downloads"),
+            files: [
+                .succeeded(link: link, originalFilename: "report.pdf", outputURL: outputURL),
+                .failed(link: link, originalFilename: "report.pdf", outputURL: outputURL, error: "HTTP 403"),
+            ]
+        )
+        let result = PDFDownloadBatchRunResult(
+            sourceKind: "url-file",
+            sourceLocation: "/tmp/urls.txt",
+            outputDirectory: URL(fileURLWithPath: "/tmp/downloads"),
+            pages: [
+                .succeeded(pageResult),
+                .failed(url: URL(string: "https://example.com/missing")!, error: "ページロードに失敗しました"),
+            ]
+        )
+
+        let json = try PDFDownloadFormatter.format(result)
+        let decoded = try JSONDecoder().decode(PDFDownloadBatchRunResult.self, from: Data(json.utf8))
+
+        XCTAssertEqual(decoded.source.kind, "url-file")
+        XCTAssertEqual(decoded.pageCount, 2)
+        XCTAssertEqual(decoded.pageSuccessCount, 0)
+        XCTAssertEqual(decoded.pageFailureCount, 2)
+        XCTAssertEqual(decoded.pdfCount, 2)
+        XCTAssertEqual(decoded.successCount, 1)
+        XCTAssertEqual(decoded.failureCount, 1)
+        XCTAssertTrue(decoded.hasFailures)
+    }
 }
 
 final class PDFDownloadRequestBuilderTests: XCTestCase {
