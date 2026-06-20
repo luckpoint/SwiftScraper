@@ -362,6 +362,9 @@ batch 実行時の最終出力は JSON です。各ページの成功 / 失敗�
 - [10. PDF 生成](docs/10-pdf-generation.md)
 - [11. WebDriver BiDi bridge](docs/11-webdriver-bidi-bridge.md)
 - [12. PDF リンクダウンロード](docs/12-pdf-link-download.md)
+- [13. Knowledge Base 向け改善ロードマップ](docs/13-knowledge-base-roadmap.md)
+- [14. 検索結果からの収集](docs/14-search-discovery.md)
+- [15. Knowledge Base ソース成果物仕様](docs/15-kb-source-spec.md)
 
 ## 制約
 - macOS 専用です
