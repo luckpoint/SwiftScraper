@@ -1,4 +1,4 @@
 interface:
   display_name: "SwiftScraper"
   short_description: "SwiftScraper CLI, PDF, and BiDi workflows"
-  default_prompt: "Use $swiftscraper to scrape a rendered page, download linked PDFs, or operate the BiDi bridge."
+  default_prompt: "Use $swiftscraper to scrape a rendered page, download and verify linked PDFs, stage them in the configured Google Drive sync folder for NotebookLM, or operate the BiDi bridge."

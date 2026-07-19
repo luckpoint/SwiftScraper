@@ -70,6 +70,7 @@ swift run swift-scraper -- \
 - `--visibility`
 - `--viewport`
 - `--persistent-store`
+- `--overwrite-pdfs`
 
 `--download-pdfs` は `--sitemap` / `--url-file` / `--concurrency` と併用できる。`--concurrency` は batch 入力と一緒に指定した場合だけ有効。
 
@@ -101,6 +102,8 @@ downloads/
 4. リンクテキストが空の場合は元ファイル名だけを使う
 5. `/`、`\`、`:`、制御文字は `_` に置換する
 6. 同名ファイルがある場合は `-2`、`-3` のように連番を付ける
+
+`--overwrite-pdfs` を指定した場合は、既存ファイルとの衝突では連番を付けず、同名ファイルを置き換える。同一実行内で同じファイル名になる PDF リンクが複数ある場合は、上書き指定時でも 2 件目以降に連番を付ける。
 
 例:
 

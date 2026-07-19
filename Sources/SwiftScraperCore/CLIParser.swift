@@ -39,6 +39,8 @@ public enum CLIParser {
                     throw ScraperError.invalidArgument("`--download-linked-pdfs` は 1 つだけ指定してください")
                 }
                 state.linkedPDFDownloadDirectory = resolvePath(raw)
+            case "--overwrite-pdfs":
+                state.overwritePDFs = true
             case "--url":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 try ensureSingleURL(existing: state.url)
@@ -214,10 +216,15 @@ public enum CLIParser {
         var imageIncludeMaybe = false
         var imageDebug = false
         var extractionFlagCount = 0
+        var overwritePDFs = false
         var prettyPrint = false
         var verbose = false
 
         mutating func makeCommand() throws -> CLICommand {
+            if overwritePDFs && pdfDownloadDirectory == nil && linkedPDFDownloadDirectory == nil {
+                throw ScraperError.invalidArgument("`--overwrite-pdfs` は `--download-pdfs` または `--download-linked-pdfs` と一緒に指定してください")
+            }
+
             if bidiServer && pdfInputPath != nil {
                 throw ScraperError.invalidArgument("`--bidi-server` と `--pdf` は同時に指定できません")
             }
@@ -309,6 +316,7 @@ public enum CLIParser {
                     wait: wait,
                     timeouts: timeouts,
                     batch: batch,
+                    overwritePDFs: overwritePDFs,
                     verbose: verbose
                 )
             )
@@ -390,6 +398,7 @@ public enum CLIParser {
                     extraction: extraction,
                     imageExtraction: imageExtraction,
                     linkedPDFDownloadDirectory: linkedPDFDownloadDirectory,
+                    overwritePDFs: overwritePDFs,
                     prettyPrint: prettyPrint,
                     verbose: verbose
                 )
@@ -526,6 +535,7 @@ public enum CLIParser {
       --output <path>                標準出力ではなくファイルへ保存
       --download-pdfs <directory>    ページ内の PDF リンクを保存
       --download-linked-pdfs <dir>   通常抽出と同時にページ内の PDF リンクを保存
+      --overwrite-pdfs               既存 PDF を連番回避せず同名で上書き
       --body-text                    document.body.innerText を抽出
       --selector-inner-html <css>    特定要素の innerHTML を抽出
       --content-only                 ヘッダ・フッタ・サイドバー等を除いた本文候補の HTML を抽出

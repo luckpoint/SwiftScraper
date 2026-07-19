@@ -193,6 +193,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
     public let extraction: ExtractionMode
     public let imageExtraction: ImageExtractionConfiguration
     public let linkedPDFDownloadDirectory: URL?
+    public let overwritePDFs: Bool
     public let prettyPrint: Bool
     public let verbose: Bool
 
@@ -212,6 +213,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
         extraction: ExtractionMode,
         imageExtraction: ImageExtractionConfiguration = .disabled,
         linkedPDFDownloadDirectory: URL? = nil,
+        overwritePDFs: Bool = false,
         prettyPrint: Bool,
         verbose: Bool
     ) {
@@ -230,6 +232,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
         self.extraction = extraction
         self.imageExtraction = imageExtraction
         self.linkedPDFDownloadDirectory = linkedPDFDownloadDirectory
+        self.overwritePDFs = overwritePDFs
         self.prettyPrint = prettyPrint
         self.verbose = verbose
     }
@@ -253,6 +256,7 @@ extension ScraperConfiguration {
             extraction: extraction,
             imageExtraction: imageExtraction,
             linkedPDFDownloadDirectory: linkedPDFDownloadDirectory,
+            overwritePDFs: overwritePDFs,
             prettyPrint: prettyPrint,
             verbose: verbose
         )
@@ -283,6 +287,7 @@ public struct PDFDownloadConfiguration: Equatable, Sendable {
     public let wait: WaitConfiguration
     public let timeouts: Timeouts
     public let batch: BatchMode?
+    public let overwritePDFs: Bool
     public let verbose: Bool
 
     public init(
@@ -297,6 +302,7 @@ public struct PDFDownloadConfiguration: Equatable, Sendable {
         wait: WaitConfiguration,
         timeouts: Timeouts,
         batch: BatchMode? = nil,
+        overwritePDFs: Bool = false,
         verbose: Bool
     ) {
         self.url = url
@@ -310,6 +316,7 @@ public struct PDFDownloadConfiguration: Equatable, Sendable {
         self.wait = wait
         self.timeouts = timeouts
         self.batch = batch
+        self.overwritePDFs = overwritePDFs
         self.verbose = verbose
     }
 }
