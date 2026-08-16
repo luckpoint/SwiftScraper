@@ -1,0 +1,195 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="2260" viewBox="0 0 1800 2260" role="img" aria-labelledby="title desc">
+  <title id="title">stage_verified_pdfs.py の処理フロー</title>
+  <desc id="desc">SwiftScraperの結果JSONから成功したPDFだけを検証し、Google Drive同期フォルダ下の新しい実行フォルダへ移動する処理フロー。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,6 L0,12 z" fill="#425466"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,6 L0,12 z" fill="#b42318"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#152536" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .bg { fill: #f7f9fc; }
+      .title { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif; font-size: 34px; font-weight: 700; fill: #152536; }
+      .subtitle { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif; font-size: 17px; fill: #526273; }
+      .section { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0.08em; fill: #607285; }
+      .node-title { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif; font-size: 20px; font-weight: 700; fill: #152536; }
+      .node-text { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif; font-size: 16px; fill: #33475b; }
+      .small { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif; font-size: 14px; fill: #526273; }
+      .code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 14px; fill: #26384a; }
+      .edge { fill: none; stroke: #425466; stroke-width: 3; marker-end: url(#arrow); }
+      .edge-red { fill: none; stroke: #b42318; stroke-width: 2.5; stroke-dasharray: 8 7; marker-end: url(#arrow-red); }
+      .label { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif; font-size: 14px; font-weight: 700; fill: #526273; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1800" height="2260"/>
+  <text class="title" x="90" y="70">stage_verified_pdfs.py の処理フロー</text>
+  <text class="subtitle" x="90" y="106">成功したPDFだけを安全に検証し、NotebookLM用のGoogle Drive同期フォルダへステージングする</text>
+
+  <text class="section" x="90" y="170">INPUTS</text>
+  <g filter="url(#shadow)">
+    <rect x="90" y="195" width="470" height="120" rx="16" fill="#e7f0ff" stroke="#8fb3e8" stroke-width="2"/>
+    <text class="node-title" x="120" y="232">結果JSON</text>
+    <text class="code" x="120" y="262">result_json</text>
+    <text class="node-text" x="120" y="290">--download-pdfs / pdf-downloads.json</text>
+
+    <rect x="665" y="195" width="470" height="120" rx="16" fill="#e7f0ff" stroke="#8fb3e8" stroke-width="2"/>
+    <text class="node-title" x="695" y="232">同期先ルート</text>
+    <text class="code" x="695" y="262">destination_root</text>
+    <text class="node-text" x="695" y="290">NotebookLM の同期フォルダ</text>
+
+    <rect x="1240" y="195" width="470" height="120" rx="16" fill="#e7f0ff" stroke="#8fb3e8" stroke-width="2"/>
+    <text class="node-title" x="1270" y="232">実行名・オプション</text>
+    <text class="code" x="1270" y="262">--run-name / --dry-run</text>
+    <text class="node-text" x="1270" y="290">既定の実行名は run</text>
+  </g>
+
+  <path class="edge" d="M325 315 V350 H900 V380"/>
+  <path class="edge" d="M900 315 V380"/>
+  <path class="edge" d="M1475 315 V350 H900 V380"/>
+
+  <g filter="url(#shadow)">
+    <rect x="550" y="380" width="700" height="92" rx="16" fill="#ffffff" stroke="#6c7f93" stroke-width="2"/>
+    <text class="node-title" x="590" y="417">引数を解析し、パスを解決</text>
+    <text class="code" x="590" y="446">parse_args() → result_json / destination_root / destination</text>
+  </g>
+  <path class="edge" d="M900 472 V505"/>
+
+  <g filter="url(#shadow)">
+    <rect x="550" y="505" width="700" height="92" rx="16" fill="#fff8df" stroke="#e3b341" stroke-width="2"/>
+    <text class="node-title" x="590" y="542">run-name は安全な単一フォルダ名か？</text>
+    <text class="node-text" x="590" y="571">空文字・.・..・/・\\ を拒否</text>
+  </g>
+  <text class="label" x="1280" y="536">NG</text>
+  <text class="label" x="925" y="620">OK</text>
+  <path class="edge" d="M900 597 V650"/>
+
+  <g filter="url(#shadow)">
+    <rect x="550" y="650" width="700" height="92" rx="16" fill="#ffffff" stroke="#6c7f93" stroke-width="2"/>
+    <text class="node-title" x="590" y="687">結果JSONを読み込む</text>
+    <text class="code" x="590" y="716">load_result() → JSON.parse / UTF-8 read</text>
+  </g>
+  <text class="label" x="1280" y="681">読込失敗</text>
+  <path class="edge" d="M900 742 V795"/>
+
+  <g filter="url(#shadow)">
+    <rect x="550" y="795" width="700" height="122" rx="16" fill="#f0ebff" stroke="#a993df" stroke-width="2"/>
+    <text class="node-title" x="590" y="832">成功した outputPath を再帰的に列挙</text>
+    <text class="code" x="590" y="861">iter_successful_paths() → success == true</text>
+    <text class="code" x="590" y="886">unique_paths() → expanduser / resolve / 重複排除</text>
+  </g>
+  <path class="edge" d="M900 917 V955"/>
+
+  <g filter="url(#shadow)">
+    <path d="M900 955 L1035 1025 L900 1095 L765 1025 Z" fill="#fff8df" stroke="#e3b341" stroke-width="2"/>
+    <text class="node-title" text-anchor="middle" x="900" y="1020">成功PDFが</text>
+    <text class="node-title" text-anchor="middle" x="900" y="1047">1件以上ある？</text>
+  </g>
+  <text class="label" x="1100" y="1010">NO: エラー</text>
+  <path class="edge" d="M900 1095 V1148"/>
+  <text class="label" x="925" y="1125">YES</text>
+
+  <g filter="url(#shadow)">
+    <rect x="550" y="1148" width="700" height="122" rx="16" fill="#ffffff" stroke="#6c7f93" stroke-width="2"/>
+    <text class="node-title" x="590" y="1185">出力ルートと同期先の安全性を確認</text>
+    <text class="code" x="590" y="1214">outputDirectory を取得（あれば）</text>
+    <text class="node-text" x="590" y="1243">同期先ルートがダウンロード出力ディレクトリの内側なら拒否</text>
+  </g>
+  <text class="label" x="1280" y="1194">危険ならエラー</text>
+  <path class="edge" d="M900 1270 V1310"/>
+
+  <g filter="url(#shadow)">
+    <path d="M900 1310 L1035 1380 L900 1450 L765 1380 Z" fill="#fff8df" stroke="#e3b341" stroke-width="2"/>
+    <text class="node-title" text-anchor="middle" x="900" y="1375">destination が</text>
+    <text class="node-title" text-anchor="middle" x="900" y="1402">既に存在する？</text>
+  </g>
+  <text class="label" x="1100" y="1365">YES: 上書き防止</text>
+  <path class="edge" d="M900 1450 V1495"/>
+  <text class="label" x="925" y="1478">NO</text>
+
+  <g filter="url(#shadow)">
+    <rect x="550" y="1495" width="700" height="142" rx="16" fill="#fff4f1" stroke="#e39a8f" stroke-width="2"/>
+    <text class="node-title" x="590" y="1532">各 source をPDFとして検証</text>
+    <text class="node-text" x="590" y="1562">存在する通常ファイル / 拡張子 .pdf / サイズ &gt; 0</text>
+    <text class="code" x="590" y="1591">先頭5バイトが %PDF-</text>
+    <text class="small" x="590" y="1617">1件でも不正なら、移動処理を開始せず終了</text>
+  </g>
+  <text class="label" x="1280" y="1551">検証失敗</text>
+  <path class="edge" d="M900 1637 V1680"/>
+
+  <g filter="url(#shadow)">
+    <rect x="550" y="1680" width="700" height="122" rx="16" fill="#f0ebff" stroke="#a993df" stroke-width="2"/>
+    <text class="node-title" x="590" y="1717">移動先を決める</text>
+    <text class="code" x="590" y="1746">relative_destination()</text>
+    <text class="node-text" x="590" y="1775">outputDirectory 配下なら相対ディレクトリ構造を保持</text>
+  </g>
+  <text class="label" x="1280" y="1726">target が存在 → エラー</text>
+  <path class="edge" d="M900 1802 V1847"/>
+
+  <g filter="url(#shadow)">
+    <path d="M900 1847 L1035 1917 L900 1987 L765 1917 Z" fill="#fff8df" stroke="#e3b341" stroke-width="2"/>
+    <text class="node-title" text-anchor="middle" x="900" y="1912">--dry-run？</text>
+    <text class="small" text-anchor="middle" x="900" y="1940">実ファイルを変更する？</text>
+  </g>
+  <text class="label" x="1048" y="1907">YES</text>
+  <path class="edge" d="M1035 1917 H1330 V2020"/>
+  <text class="label" x="705" y="2002">NO</text>
+  <path class="edge" d="M765 1917 H470 V2020"/>
+
+  <g filter="url(#shadow)">
+    <rect x="170" y="2020" width="600" height="100" rx="16" fill="#e8f7ef" stroke="#77b996" stroke-width="2"/>
+    <text class="node-title" x="210" y="2057">親ディレクトリを作成して移動</text>
+    <text class="code" x="210" y="2086">mkdir(parents=True) → shutil.move()</text>
+
+    <rect x="1030" y="2020" width="600" height="100" rx="16" fill="#e8f7ef" stroke="#77b996" stroke-width="2"/>
+    <text class="node-title" x="1070" y="2057">移動は行わず、計画だけ出力</text>
+    <text class="code" x="1070" y="2086">dryRun: true / movedCount は対象件数</text>
+  </g>
+  <path class="edge" d="M470 2120 V2160 H900"/>
+  <path class="edge" d="M1330 2120 V2160 H900"/>
+
+  <g filter="url(#shadow)">
+    <rect x="550" y="2160" width="700" height="72" rx="16" fill="#153c5c" stroke="#153c5c" stroke-width="2"/>
+    <text font-family="-apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif" font-size="20" font-weight="700" fill="#ffffff" x="590" y="2204">結果JSONを標準出力 / exit 0</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1370" y="850" width="340" height="430" rx="18" fill="#fff1f0" stroke="#e39a8f" stroke-width="2"/>
+    <text class="node-title" x="1405" y="892" fill="#8b1e16">失敗時の共通処理</text>
+    <text class="node-text" x="1405" y="932">RuntimeError を捕捉</text>
+    <text class="code" x="1405" y="967">stderr:</text>
+    <text class="code" x="1405" y="992">stage_verified_pdfs:</text>
+    <text class="code" x="1405" y="1017">&lt;エラーメッセージ&gt;</text>
+    <line x1="1405" y1="1040" x2="1675" y2="1040" stroke="#e39a8f"/>
+    <text class="node-text" x="1405" y="1080">・run-name 不正</text>
+    <text class="node-text" x="1405" y="1110">・JSON 読込失敗</text>
+    <text class="node-text" x="1405" y="1140">・成功PDFなし</text>
+    <text class="node-text" x="1405" y="1170">・安全性 / 上書き検査</text>
+    <text class="node-text" x="1405" y="1200">・PDF 検証失敗</text>
+    <text class="node-title" x="1405" y="1245" fill="#8b1e16">exit 1</text>
+  </g>
+  <path class="edge-red" d="M1250 551 H1325 V900 H1370"/>
+  <path class="edge-red" d="M1250 696 H1295 V950 H1370"/>
+  <path class="edge-red" d="M1035 1025 H1370"/>
+  <path class="edge-red" d="M1250 1209 H1340 V1000 H1370"/>
+  <path class="edge-red" d="M1035 1380 H1310 V1050 H1370"/>
+  <path class="edge-red" d="M1250 1566 H1280 V1100 H1370"/>
+  <path class="edge-red" d="M1250 1741 H1260 V1150 H1370"/>
+
+  <g>
+    <rect x="90" y="2245" width="30" height="10" rx="5" fill="#8fb3e8"/>
+    <text class="small" x="135" y="2256">入力 / 通常処理</text>
+    <rect x="350" y="2245" width="30" height="10" rx="5" fill="#a993df"/>
+    <text class="small" x="395" y="2256">再帰列挙・パス計算</text>
+    <rect x="670" y="2245" width="30" height="10" rx="5" fill="#e3b341"/>
+    <text class="small" x="715" y="2256">判定</text>
+    <rect x="820" y="2245" width="30" height="10" rx="5" fill="#77b996"/>
+    <text class="small" x="865" y="2256">成功</text>
+    <rect x="950" y="2245" width="30" height="10" rx="5" fill="#e39a8f"/>
+    <text class="small" x="995" y="2256">失敗 / 中止</text>
+  </g>
+</svg>

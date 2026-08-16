@@ -18,6 +18,7 @@
 - PDF リンク保存:
   - `--download-pdfs <dir>`: 各ページの PDF リンクだけを保存する PDF 専用 batch
   - `--download-linked-pdfs <dir>`: 通常 scrape の batch と同時に PDF リンクも保存する sidecar
+  - `--overwrite-pdfs`: 既存 PDF を同名で置き換える
 
 ## URL ソースの解決
 ### `--sitemap`

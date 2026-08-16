@@ -664,6 +664,7 @@ final class CLIParserTests: XCTestCase {
             "--wait-selector", ".reports",
             "--header", "Accept-Language: ja",
             "--cookie", "name=session;value=abc;domain=example.com",
+            "--overwrite-pdfs",
             "--verbose",
         ])
 
@@ -677,6 +678,7 @@ final class CLIParserTests: XCTestCase {
         XCTAssertEqual(config.wait.selectorConditions, [".reports"])
         XCTAssertEqual(config.customHeaders["Accept-Language"], "ja")
         XCTAssertEqual(config.cookies.count, 1)
+        XCTAssertTrue(config.overwritePDFs)
         XCTAssertTrue(config.verbose)
     }
 
@@ -724,6 +726,7 @@ final class CLIParserTests: XCTestCase {
             "--markdown",
             "--output", "out/pages.json",
             "--download-linked-pdfs", "downloads",
+            "--overwrite-pdfs",
         ])
 
         guard case .run(let config) = command else {
@@ -733,6 +736,7 @@ final class CLIParserTests: XCTestCase {
         XCTAssertEqual(config.extraction, .contentOnly)
         XCTAssertEqual(config.outputFormat, .markdown)
         XCTAssertTrue(config.linkedPDFDownloadDirectory?.path.hasSuffix("/downloads") == true)
+        XCTAssertTrue(config.overwritePDFs)
     }
 
     func testDownloadLinkedPDFsParsesSitemapBatch() throws {
@@ -821,6 +825,20 @@ final class CLIParserTests: XCTestCase {
             XCTAssertEqual(
                 error as? ScraperError,
                 .invalidArgument("`--download-pdfs` と `--download-linked-pdfs` は同時に指定できません")
+            )
+        }
+    }
+
+    func testOverwritePDFsRequiresPDFDownloadMode() {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com",
+                "--overwrite-pdfs",
+            ])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--overwrite-pdfs` は `--download-pdfs` または `--download-linked-pdfs` と一緒に指定してください")
             )
         }
     }

@@ -214,7 +214,8 @@ enum PDFDownloadFileNaming {
     static func uniqueFileURL(
         suggestedFileName: String,
         in directory: URL,
-        usedFileNames: inout Set<String>
+        usedFileNames: inout Set<String>,
+        overwriteExisting: Bool = false
     ) -> URL {
         let sanitized = sanitizeFileName(suggestedFileName, fallback: "document.pdf")
         let suggestedURL = directory.appendingPathComponent(sanitized, isDirectory: false)
@@ -224,7 +225,8 @@ enum PDFDownloadFileNaming {
         var candidateName = sanitized
         var counter = 2
         while usedFileNames.contains(candidateName.lowercased())
-            || FileManager.default.fileExists(atPath: directory.appendingPathComponent(candidateName).path) {
+            || (!overwriteExisting
+                && FileManager.default.fileExists(atPath: directory.appendingPathComponent(candidateName).path)) {
             if extensionName.isEmpty {
                 candidateName = "\(stem)-\(counter)"
             } else {
@@ -327,6 +329,7 @@ struct PDFDownloadSaver {
     let outputDirectory: URL
     let timeout: TimeInterval
     let customHeaders: [String: String]
+    let overwriteExistingFiles: Bool
     let logger: StderrLogger
 
     func save(_ collection: PDFLinkCollection) async throws -> PDFDownloadRunResult {
@@ -359,7 +362,8 @@ struct PDFDownloadSaver {
             let outputURL = PDFDownloadFileNaming.uniqueFileURL(
                 suggestedFileName: suggestedName,
                 in: sourceDirectory,
-                usedFileNames: &usedFileNames
+                usedFileNames: &usedFileNames,
+                overwriteExisting: overwriteExistingFiles
             )
 
             do {
@@ -399,7 +403,7 @@ struct PDFDownloadSaver {
         userAgent: String?
     ) async throws {
         if url.isFileURL {
-            try FileManager.default.copyItem(at: url, to: outputURL)
+            try copyLocalFile(url, to: outputURL)
             return
         }
 
@@ -426,6 +430,31 @@ struct PDFDownloadSaver {
         do {
             try data.write(to: outputURL, options: .atomic)
         } catch {
+            throw ScraperError.pdfDownloadFailed("\(outputURL.path): \(error.localizedDescription)")
+        }
+    }
+
+    private func copyLocalFile(_ url: URL, to outputURL: URL) throws {
+        let fileManager = FileManager.default
+
+        guard overwriteExistingFiles, fileManager.fileExists(atPath: outputURL.path) else {
+            do {
+                try fileManager.copyItem(at: url, to: outputURL)
+            } catch {
+                throw ScraperError.pdfDownloadFailed("\(outputURL.path): \(error.localizedDescription)")
+            }
+            return
+        }
+
+        let temporaryURL = outputURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(".\(UUID().uuidString)-\(outputURL.lastPathComponent)", isDirectory: false)
+
+        do {
+            try fileManager.copyItem(at: url, to: temporaryURL)
+            _ = try fileManager.replaceItemAt(outputURL, withItemAt: temporaryURL)
+        } catch {
+            try? fileManager.removeItem(at: temporaryURL)
             throw ScraperError.pdfDownloadFailed("\(outputURL.path): \(error.localizedDescription)")
         }
     }
@@ -614,6 +643,7 @@ extension PDFDownloadConfiguration {
             wait: wait,
             timeouts: timeouts,
             batch: batch,
+            overwritePDFs: overwritePDFs,
             verbose: verbose
         )
     }
@@ -634,6 +664,7 @@ extension PDFDownloadConfiguration {
             outputFormat: .plain,
             extraction: .outerHTML,
             imageExtraction: .disabled,
+            overwritePDFs: false,
             prettyPrint: false,
             verbose: verbose
         )
@@ -644,6 +675,7 @@ extension PDFDownloadConfiguration {
             outputDirectory: outputDirectory,
             timeout: timeouts.load,
             customHeaders: customHeaders,
+            overwriteExistingFiles: overwritePDFs,
             logger: logger
         )
     }

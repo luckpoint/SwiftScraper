@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""Stage successful SwiftScraper PDF downloads in a Google Drive sync folder."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import sys
+from pathlib import Path
+from typing import Any, Iterator
+
+
+DEFAULT_RUN_NAME = "run"
+
+
+def iter_successful_paths(value: Any) -> Iterator[Path]:
+    if isinstance(value, dict):
+        if value.get("success") is True and isinstance(value.get("outputPath"), str):
+            yield Path(value["outputPath"])
+        for child in value.values():
+            yield from iter_successful_paths(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from iter_successful_paths(child)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Move verified successful SwiftScraper PDFs into a unique staging folder."
+    )
+    parser.add_argument("result_json", type=Path, help="--download-pdfs JSON output or pdf-downloads.json")
+    parser.add_argument("destination_root", type=Path, help="NotebookLM sync folder")
+    parser.add_argument(
+        "--run-name",
+        default=DEFAULT_RUN_NAME,
+        help="Name of the new collection folder under destination_root (default: run)",
+    )
+    parser.add_argument("--dry-run", action="store_true", help="Validate and print moves without changing files")
+    return parser.parse_args()
+
+
+def load_result(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise RuntimeError(f"結果JSONを読み込めません: {path}: {error}") from error
+
+
+def output_directory(result: Any) -> Path | None:
+    if isinstance(result, dict) and isinstance(result.get("outputDirectory"), str):
+        return Path(result["outputDirectory"]).expanduser().resolve()
+    return None
+
+
+def unique_paths(paths: Iterator[Path]) -> list[Path]:
+    seen: set[Path] = set()
+    result: list[Path] = []
+    for path in paths:
+        resolved = path.expanduser().resolve()
+        if resolved not in seen:
+            seen.add(resolved)
+            result.append(resolved)
+    return result
+
+
+def relative_destination(source: Path, output_root: Path | None, destination: Path) -> Path:
+    if output_root is not None:
+        try:
+            return destination / source.relative_to(output_root)
+        except ValueError:
+            pass
+    return destination / source.name
+
+
+def ensure_safe_run_name(run_name: str) -> None:
+    if not run_name or run_name in {".", ".."} or "/" in run_name or "\\" in run_name:
+        raise RuntimeError("--run-name は単一のフォルダ名を指定してください")
+
+
+def main() -> int:
+    args = parse_args()
+    result_json = args.result_json.expanduser().resolve()
+    destination_root = args.destination_root.expanduser().resolve()
+    destination = destination_root / args.run_name
+
+    try:
+        ensure_safe_run_name(args.run_name)
+        result = load_result(result_json)
+        paths = unique_paths(iter_successful_paths(result))
+        if not paths:
+            raise RuntimeError("成功したPDFが結果JSONにありません")
+
+        output_root = output_directory(result)
+        if output_root is not None:
+            try:
+                destination_root.relative_to(output_root)
+            except ValueError:
+                pass
+            else:
+                raise RuntimeError("同期先はダウンロード出力ディレクトリの外側に指定してください")
+
+        if destination.exists():
+            raise RuntimeError(f"移動先フォルダがすでに存在します: {destination}")
+
+        moves: list[tuple[Path, Path]] = []
+        for source in paths:
+            if not source.is_file():
+                raise RuntimeError(f"PDFファイルがありません: {source}")
+            if source.suffix.lower() != ".pdf":
+                raise RuntimeError(f"PDF拡張子ではありません: {source}")
+            if source.stat().st_size == 0:
+                raise RuntimeError(f"空のPDFファイルです: {source}")
+            with source.open("rb") as handle:
+                if handle.read(5) != b"%PDF-":
+                    raise RuntimeError(f"PDFヘッダを確認できません: {source}")
+
+            target = relative_destination(source, output_root, destination)
+            if target.exists():
+                raise RuntimeError(f"移動先ファイルがすでに存在します: {target}")
+            moves.append((source, target))
+
+        if not args.dry_run:
+            for _, target in moves:
+                target.parent.mkdir(parents=True, exist_ok=True)
+            for source, target in moves:
+                shutil.move(str(source), str(target))
+
+        payload = {
+            "destination": str(destination),
+            "dryRun": args.dry_run,
+            "movedCount": len(moves),
+            "files": [
+                {"sourcePath": str(source), "destinationPath": str(target)}
+                for source, target in moves
+            ],
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    except RuntimeError as error:
+        print(f"stage_verified_pdfs: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

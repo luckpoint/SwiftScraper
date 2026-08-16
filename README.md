@@ -41,6 +41,19 @@ swift build -c release
 .build/release/swift-scraper
 ```
 
+### インストール
+Release ビルドを実行し、`~/.local/bin/swift-scraper` に配置する:
+
+```bash
+./scripts/install.sh
+```
+
+インストール先を変更する場合は `BIN_DIR` を指定する:
+
+```bash
+BIN_DIR="$HOME/bin" ./scripts/install.sh
+```
+
 ## 実行方法
 ### 基本
 ```bash
@@ -74,6 +87,7 @@ swift run swift-scraper -- https://example.com
 --js-timeout <seconds>         JavaScript 実行タイムアウト。既定 10
 --download-pdfs <directory>    ページ内の PDF リンクを保存
 --download-linked-pdfs <dir>   通常抽出と同時にページ内の PDF リンクを保存
+--overwrite-pdfs               既存 PDF を連番回避せず同名で上書き
 --output <path>                標準出力ではなくファイルへ保存
 --body-text                    document.body.innerText を抽出
 --selector-inner-html <css>    特定要素の innerHTML を抽出
@@ -146,6 +160,8 @@ PDF は `downloads/<host>/<source-path>/` に保存されます。上の例で�
 ```text
 Okta Model Card Governance Ana-okta-model-card-governance-analyzer-2026-02-13.pdf
 ```
+
+同名ファイルが既にある場合、通常は `-2`、`-3` のように連番を付けて保存します。既存 PDF を同名で置き換えたい場合は `--overwrite-pdfs` を指定します。同一実行内に同じファイル名になるリンクが複数ある場合は、上書き指定時でも 2 件目以降に連番を付けます。
 
 実行結果は stdout に JSON で出力され、保存先、成功件数、失敗件数、各 PDF の URL と保存パスを確認できます。`--cookie` / `--cookie-file` / `--cookie-jar` / `--header` / 待機系オプションは PDF リンク抽出にも利用できます。
 

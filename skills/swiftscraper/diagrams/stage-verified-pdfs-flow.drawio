@@ -1,0 +1,96 @@
+<mxfile host="app.diagrams.net" modified="2026-07-18T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="stage-verified-pdfs-flow" name="stage_verified_pdfs">
+    <mxGraphModel dx="1800" dy="2260" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="2260" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="stage_verified_pdfs.py の処理フロー&lt;br&gt;&lt;font style=&quot;font-size:15px;color:#526273&quot;&gt;成功したPDFだけを安全に検証し、NotebookLM用のGoogle Drive同期フォルダへステージングする&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#152536;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="45" width="1000" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="result-json" value="結果JSON&lt;br&gt;&lt;font face=&quot;monospace&quot;&gt;result_json&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:13px;color:#33475b&quot;&gt;--download-pdfs / pdf-downloads.json&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f0ff;strokeColor=#8fb3e8;strokeWidth=2;fontColor=#152536;fontSize=16;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="90" y="195" width="470" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="destination-root" value="同期先ルート&lt;br&gt;&lt;font face=&quot;monospace&quot;&gt;destination_root&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:13px;color:#33475b&quot;&gt;NotebookLM の同期フォルダ&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f0ff;strokeColor=#8fb3e8;strokeWidth=2;fontColor=#152536;fontSize=16;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="665" y="195" width="470" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="options" value="実行名・オプション&lt;br&gt;&lt;font face=&quot;monospace&quot;&gt;--run-name / --dry-run&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:13px;color:#33475b&quot;&gt;既定の実行名は run&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e7f0ff;strokeColor=#8fb3e8;strokeWidth=2;fontColor=#152536;fontSize=16;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="195" width="470" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="parse" value="引数を解析し、パスを解決&lt;br&gt;&lt;font face=&quot;monospace&quot; style=&quot;font-size:13px&quot;&gt;parse_args() → result_json / destination_root / destination&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c7f93;strokeWidth=2;fontColor=#152536;fontSize=16;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="550" y="380" width="700" height="92" as="geometry"/>
+        </mxCell>
+        <mxCell id="safe-run-name" value="run-name は安全な単一フォルダ名か？&lt;br&gt;&lt;font style=&quot;font-size:13px;color:#33475b&quot;&gt;空文字・.・..・/・\\ を拒否&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8df;strokeColor=#e3b341;strokeWidth=2;fontColor=#152536;fontSize=16;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="550" y="505" width="700" height="92" as="geometry"/>
+        </mxCell>
+        <mxCell id="load" value="結果JSONを読み込む&lt;br&gt;&lt;font face=&quot;monospace&quot; style=&quot;font-size:13px&quot;&gt;load_result() → JSON.parse / UTF-8 read&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c7f93;strokeWidth=2;fontColor=#152536;fontSize=16;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="550" y="650" width="700" height="92" as="geometry"/>
+        </mxCell>
+        <mxCell id="enumerate" value="成功した outputPath を再帰的に列挙&lt;br&gt;&lt;font face=&quot;monospace&quot; style=&quot;font-size:13px&quot;&gt;iter_successful_paths() → success == true&lt;br&gt;unique_paths() → expanduser / resolve / 重複排除&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0ebff;strokeColor=#a993df;strokeWidth=2;fontColor=#152536;fontSize=16;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="550" y="795" width="700" height="122" as="geometry"/>
+        </mxCell>
+        <mxCell id="has-paths" value="成功PDFが&lt;br&gt;1件以上ある？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff8df;strokeColor=#e3b341;strokeWidth=2;fontColor=#152536;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="765" y="955" width="270" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="output-safety" value="出力ルートと同期先の安全性を確認&lt;br&gt;&lt;font face=&quot;monospace&quot; style=&quot;font-size:13px&quot;&gt;outputDirectory を取得（あれば）&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:13px;color:#33475b&quot;&gt;同期先ルートがダウンロード出力ディレクトリの内側なら拒否&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c7f93;strokeWidth=2;fontColor=#152536;fontSize=16;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="550" y="1148" width="700" height="122" as="geometry"/>
+        </mxCell>
+        <mxCell id="destination-exists" value="destination が&lt;br&gt;既に存在する？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff8df;strokeColor=#e3b341;strokeWidth=2;fontColor=#152536;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="765" y="1310" width="270" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="validate-pdf" value="各 source をPDFとして検証&lt;br&gt;&lt;font style=&quot;font-size:13px;color:#33475b&quot;&gt;存在する通常ファイル / 拡張子 .pdf / サイズ &amp;gt; 0&lt;/font&gt;&lt;br&gt;&lt;font face=&quot;monospace&quot; style=&quot;font-size:13px&quot;&gt;先頭5バイトが %PDF-&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:12px;color:#526273&quot;&gt;1件でも不正なら、移動処理を開始せず終了&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4f1;strokeColor=#e39a8f;strokeWidth=2;fontColor=#152536;fontSize=16;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="550" y="1495" width="700" height="142" as="geometry"/>
+        </mxCell>
+        <mxCell id="relative-destination" value="移動先を決める&lt;br&gt;&lt;font face=&quot;monospace&quot; style=&quot;font-size:13px&quot;&gt;relative_destination()&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:13px;color:#33475b&quot;&gt;outputDirectory 配下なら相対ディレクトリ構造を保持&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0ebff;strokeColor=#a993df;strokeWidth=2;fontColor=#152536;fontSize=16;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="550" y="1680" width="700" height="122" as="geometry"/>
+        </mxCell>
+        <mxCell id="dry-run" value="--dry-run？&lt;br&gt;&lt;font style=&quot;font-size:13px;color:#526273&quot;&gt;実ファイルを変更する？&lt;/font&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff8df;strokeColor=#e3b341;strokeWidth=2;fontColor=#152536;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="765" y="1847" width="270" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="move" value="親ディレクトリを作成して移動&lt;br&gt;&lt;font face=&quot;monospace&quot; style=&quot;font-size:13px&quot;&gt;mkdir(parents=True) → shutil.move()&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f7ef;strokeColor=#77b996;strokeWidth=2;fontColor=#152536;fontSize=16;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="170" y="2020" width="600" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="dry-output" value="移動は行わず、計画だけ出力&lt;br&gt;&lt;font face=&quot;monospace&quot; style=&quot;font-size:13px&quot;&gt;dryRun: true / movedCount は対象件数&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f7ef;strokeColor=#77b996;strokeWidth=2;fontColor=#152536;fontSize=16;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="2020" width="600" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="success" value="結果JSONを標準出力 / exit 0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#153c5c;strokeColor=#153c5c;strokeWidth=2;fontColor=#ffffff;fontSize=18;fontStyle=1;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="550" y="2160" width="700" height="72" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="error" value="失敗時の共通処理&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px;color:#33475b&quot;&gt;RuntimeError を捕捉&lt;br&gt;&lt;br&gt;&lt;font face=&quot;monospace&quot;&gt;stderr:&lt;br&gt;stage_verified_pdfs:&lt;br&gt;&amp;lt;エラーメッセージ&amp;gt;&lt;/font&gt;&lt;br&gt;&lt;br&gt;・run-name 不正&lt;br&gt;・JSON 読込失敗&lt;br&gt;・成功PDFなし&lt;br&gt;・安全性 / 上書き検査&lt;br&gt;・PDF 検証失敗&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size:18px;color:#8b1e16&quot;&gt;exit 1&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff1f0;strokeColor=#e39a8f;strokeWidth=2;fontColor=#8b1e16;fontSize=16;spacing=14;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="850" width="340" height="430" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="result-json" target="parse"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="destination-root" target="parse"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="options" target="parse"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="parse" target="safe-run-name"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="OK" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;fontColor=#526273;fontStyle=1;" edge="1" parent="1" source="safe-run-name" target="load"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="NG" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b42318;strokeWidth=2;dashed=1;endArrow=block;endFill=1;fontColor=#b42318;fontStyle=1;" edge="1" parent="1" source="safe-run-name" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="load" target="enumerate"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="enumerate" target="has-paths"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;fontColor=#526273;fontStyle=1;" edge="1" parent="1" source="has-paths" target="output-safety"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b42318;strokeWidth=2;dashed=1;endArrow=block;endFill=1;fontColor=#b42318;fontStyle=1;" edge="1" parent="1" source="has-paths" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b42318;strokeWidth=2;dashed=1;endArrow=block;endFill=1;" edge="1" parent="1" source="load" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e12" value="危険ならエラー" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b42318;strokeWidth=2;dashed=1;endArrow=block;endFill=1;fontColor=#b42318;fontStyle=1;" edge="1" parent="1" source="output-safety" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="output-safety" target="destination-exists"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e14" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;fontColor=#526273;fontStyle=1;" edge="1" parent="1" source="destination-exists" target="validate-pdf"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e15" value="YES: 上書き防止" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b42318;strokeWidth=2;dashed=1;endArrow=block;endFill=1;fontColor=#b42318;fontStyle=1;" edge="1" parent="1" source="destination-exists" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e16" value="検証失敗" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b42318;strokeWidth=2;dashed=1;endArrow=block;endFill=1;fontColor=#b42318;fontStyle=1;" edge="1" parent="1" source="validate-pdf" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="validate-pdf" target="relative-destination"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e18" value="target が存在 → エラー" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b42318;strokeWidth=2;dashed=1;endArrow=block;endFill=1;fontColor=#b42318;fontStyle=1;" edge="1" parent="1" source="relative-destination" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="relative-destination" target="dry-run"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e20" value="NO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;fontColor=#526273;fontStyle=1;" edge="1" parent="1" source="dry-run" target="move"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e21" value="YES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;fontColor=#526273;fontStyle=1;" edge="1" parent="1" source="dry-run" target="dry-output"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="move" target="success"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#425466;strokeWidth=2;endArrow=block;endFill=1;" edge="1" parent="1" source="dry-output" target="success"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="note" value="薄紫：再帰的な結果JSON走査 / パス計算&lt;br&gt;黄色：安全性・存在判定&lt;br&gt;赤破線：RuntimeError → stderr → exit 1" style="text;html=1;align=left;verticalAlign=top;fontSize=13;fontColor=#526273;spacing=0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="2140" width="360" height="90" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -64,6 +64,84 @@ final class PDFDownloadFileNamingTests: XCTestCase {
         XCTAssertEqual(first.lastPathComponent, "report.pdf")
         XCTAssertEqual(second.lastPathComponent, "report-2.pdf")
     }
+
+    func testUniqueFileURLCanOverwriteExistingFile() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SwiftScraperTests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: directory)
+        }
+
+        let existingURL = directory.appendingPathComponent("report.pdf")
+        try Data("existing".utf8).write(to: existingURL)
+
+        var usedWithoutOverwrite: Set<String> = []
+        let uniqueURL = PDFDownloadFileNaming.uniqueFileURL(
+            suggestedFileName: "report.pdf",
+            in: directory,
+            usedFileNames: &usedWithoutOverwrite
+        )
+
+        var usedWithOverwrite: Set<String> = []
+        let overwriteURL = PDFDownloadFileNaming.uniqueFileURL(
+            suggestedFileName: "report.pdf",
+            in: directory,
+            usedFileNames: &usedWithOverwrite,
+            overwriteExisting: true
+        )
+
+        XCTAssertEqual(uniqueURL.lastPathComponent, "report-2.pdf")
+        XCTAssertEqual(overwriteURL.lastPathComponent, "report.pdf")
+    }
+}
+
+final class PDFDownloadSaverTests: XCTestCase {
+    func testOverwriteExistingFileReplacesFileInsteadOfAddingCounter() async throws {
+        let rootDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SwiftScraperTests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let sourceDirectory = rootDirectory.appendingPathComponent("source", isDirectory: true)
+        let outputDirectory = rootDirectory.appendingPathComponent("downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceDirectory, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: rootDirectory)
+        }
+
+        let sourcePDFURL = sourceDirectory.appendingPathComponent("report.pdf")
+        try Data("new".utf8).write(to: sourcePDFURL)
+
+        let pageURL = URL(string: "https://example.com/legal/")!
+        let pageOutputDirectory = PDFDownloadFileNaming.sourceDirectory(for: pageURL, under: outputDirectory)
+        try FileManager.default.createDirectory(at: pageOutputDirectory, withIntermediateDirectories: true)
+        let existingOutputURL = pageOutputDirectory.appendingPathComponent("Report-report.pdf")
+        try Data("old".utf8).write(to: existingOutputURL)
+
+        let saver = PDFDownloadSaver(
+            outputDirectory: outputDirectory,
+            timeout: 1,
+            customHeaders: [:],
+            overwriteExistingFiles: true,
+            logger: StderrLogger(verbose: false)
+        )
+        let collection = PDFLinkCollection(
+            sourceURL: pageURL,
+            links: [PDFLinkCandidate(url: sourcePDFURL, text: "Report")],
+            userAgent: nil,
+            cookies: []
+        )
+
+        let result = try await saver.save(collection)
+
+        XCTAssertEqual(result.files[0].outputPath, existingOutputURL.path)
+        XCTAssertEqual(try String(contentsOf: existingOutputURL, encoding: .utf8), "new")
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: pageOutputDirectory.appendingPathComponent("Report-report-2.pdf").path
+            )
+        )
+    }
 }
 
 final class PDFDownloadFormatterTests: XCTestCase {
