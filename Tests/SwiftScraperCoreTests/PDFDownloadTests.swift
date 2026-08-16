@@ -159,12 +159,26 @@ final class PDFDownloadRequestBuilderTests: XCTestCase {
             timeout: 10,
             customHeaders: [:],
             cookies: [
-                CookieDefinition(name: "session", value: "abc", domain: "example.com", path: "/", secure: true),
+                CookieDefinition(name: "session", value: "abc", domain: ".example.com", path: "/", secure: true),
                 CookieDefinition(name: "other", value: "ignored", domain: "other.example", path: "/", secure: true),
             ],
             userAgent: nil
         )
 
         XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "session=abc")
+    }
+
+    func testMakeRequestDoesNotSendHostOnlyCookieToSubdomain() {
+        let request = PDFDownloadRequestBuilder.makeRequest(
+            url: URL(string: "https://docs.example.com/files/report.pdf")!,
+            timeout: 10,
+            customHeaders: [:],
+            cookies: [
+                CookieDefinition(name: "session", value: "abc", domain: "example.com", secure: true, hostOnly: true),
+            ],
+            userAgent: nil
+        )
+
+        XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
     }
 }

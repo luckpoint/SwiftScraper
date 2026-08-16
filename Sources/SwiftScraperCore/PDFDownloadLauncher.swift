@@ -310,7 +310,7 @@ enum PDFDownloadRequestBuilder {
     }
 
     private static func cookieHeader(for url: URL, cookies: [CookieDefinition]) -> String? {
-        let matchingCookies = cookies.filter { cookieMatches($0, url: url) }
+        let matchingCookies = cookies.filter { $0.matches(url: url) }
         guard !matchingCookies.isEmpty else {
             return nil
         }
@@ -321,28 +321,6 @@ enum PDFDownloadRequestBuilder {
             .joined(separator: "; ")
     }
 
-    private static func cookieMatches(_ cookie: CookieDefinition, url: URL) -> Bool {
-        guard let host = url.host?.lowercased() else {
-            return false
-        }
-
-        if let expires = cookie.expires, expires <= Date() {
-            return false
-        }
-
-        if cookie.secure && url.scheme?.lowercased() != "https" {
-            return false
-        }
-
-        let domain = cookie.domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
-        guard host == domain || host.hasSuffix(".\(domain)") else {
-            return false
-        }
-
-        let requestPath = url.path.isEmpty ? "/" : url.path
-        let cookiePath = cookie.path.isEmpty ? "/" : cookie.path
-        return requestPath.hasPrefix(cookiePath)
-    }
 }
 
 struct PDFDownloadSaver {

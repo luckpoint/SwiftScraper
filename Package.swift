@@ -27,6 +27,10 @@ let package = Package(
                 .product(name: "NIOWebSocket", package: "swift-nio"),
                 "SwiftSoup",
                 "Ink",
+            ],
+            linkerSettings: [
+                .linkedLibrary("sqlite3"),
+                .linkedFramework("Security"),
             ]
         ),
         .executableTarget(

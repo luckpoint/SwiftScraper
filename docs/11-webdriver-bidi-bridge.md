@@ -106,7 +106,9 @@ swift run swift-scraper -- \
 
 ## 併用できる主なオプション
 - `--url <url>`: 起動時に最初に開く URL
-- `--cookie <spec>` / `--cookie-file <path>`: 起動時に Cookie を注入
+- `--cookie <spec>` / `--cookie-file <path>`: 起動時に明示 Cookie を注入
+- `--browser-cookies chrome|firefox` / `--browser-profile <name|path>`: macOS Chrome/Firefox の既存プロファイル Cookie を起動時の設定へ取り込む。Cookie DB は一度だけ読み込む
+- `--browser-cookies` と `--cookie-jar` は併用不可。明示 Cookie はブラウザ Cookie より優先される
 - `--header <Name: Value>`: navigation request に HTTP header を追加。`User-Agent` は `WKWebView.customUserAgent` にも反映
 - `--persistent-store`: 永続 `WKWebsiteDataStore` を使う
 - `--visibility <mode>`: `windowless` / `hidden-window` / `visible-window`。`visible-window` は起動時に `SwiftScraper BiDi` window を通常ウィンドウとして前面化する。close ボタンでは server を止めず、window だけ非表示にする

@@ -2,6 +2,13 @@ import Foundation
 
 public enum CLIParser {
     public static func parse(arguments: [String]) throws -> CLICommand {
+        try parse(arguments: arguments, browserCookieReader: nil)
+    }
+
+    static func parse(
+        arguments: [String],
+        browserCookieReader: (any BrowserCookieReader)?
+    ) throws -> CLICommand {
         let normalizedArguments = stripSwiftRunArgumentSeparator(from: arguments)
 
         if normalizedArguments.contains("--help") || normalizedArguments.contains("-h") {
@@ -55,6 +62,23 @@ public enum CLIParser {
                     throw ScraperError.invalidArgument("`--cookie-jar` は 1 つだけ指定してください")
                 }
                 state.cookieJar = resolvePath(raw)
+            case "--browser-cookies":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                guard state.browserCookieBrowser == nil else {
+                    throw ScraperError.invalidArgument("`--browser-cookies` は 1 つだけ指定してください")
+                }
+                guard let browser = BrowserCookieBrowser(rawValue: raw.lowercased()) else {
+                    throw ScraperError.invalidArgument(
+                        "`--browser-cookies` は chrome または firefox のみ対応しています。Brave、Windows/Linux、Firefox コンテナは対象外です"
+                    )
+                }
+                state.browserCookieBrowser = browser
+            case "--browser-profile":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                guard state.browserProfile == nil, !raw.isEmpty else {
+                    throw ScraperError.invalidArgument("`--browser-profile` は 1 つだけ指定し、空にできません")
+                }
+                state.browserProfile = raw
             case "--header":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 let (name, value) = try parseHeader(raw)
@@ -175,7 +199,7 @@ public enum CLIParser {
             index += 1
         }
 
-        return try state.makeCommand()
+        return try state.makeCommand(browserCookieReader: browserCookieReader)
     }
 
     private struct ParseState {
@@ -191,6 +215,8 @@ public enum CLIParser {
         var cookies: [CookieDefinition] = []
         var cookieFiles: [URL] = []
         var cookieJar: URL?
+        var browserCookieBrowser: BrowserCookieBrowser?
+        var browserProfile: String?
         var customHeaders: [String: String] = [:]
         var dataStoreMode: DataStoreMode = .ephemeral
         var visibility: VisibilityMode = .windowless
@@ -217,7 +243,15 @@ public enum CLIParser {
         var prettyPrint = false
         var verbose = false
 
-        mutating func makeCommand() throws -> CLICommand {
+        mutating func makeCommand(browserCookieReader: (any BrowserCookieReader)?) throws -> CLICommand {
+            if browserProfile != nil && browserCookieBrowser == nil {
+                throw ScraperError.invalidArgument("`--browser-profile` は `--browser-cookies chrome|firefox` と一緒に指定してください")
+            }
+
+            if browserCookieBrowser != nil && cookieJar != nil {
+                throw ScraperError.invalidArgument("`--browser-cookies` と `--cookie-jar` は併用できません")
+            }
+
             if bidiServer && pdfInputPath != nil {
                 throw ScraperError.invalidArgument("`--bidi-server` と `--pdf` は同時に指定できません")
             }
@@ -238,6 +272,10 @@ public enum CLIParser {
                 throw ScraperError.invalidArgument("`--pdf` と `--download-linked-pdfs` は同時に指定できません")
             }
 
+            if pdfInputPath != nil && browserCookieBrowser != nil {
+                throw ScraperError.invalidArgument("`--browser-cookies` は `--pdf` では使用できません")
+            }
+
             if pdfDownloadDirectory != nil && linkedPDFDownloadDirectory != nil {
                 throw ScraperError.invalidArgument("`--download-pdfs` と `--download-linked-pdfs` は同時に指定できません")
             }
@@ -251,6 +289,7 @@ public enum CLIParser {
             }
 
             try loadCookieFiles()
+            try loadBrowserCookies(using: browserCookieReader)
 
             if let pdfDownloadDirectory {
                 return try makePDFDownloadCommand(outputDirectory: pdfDownloadDirectory)
@@ -266,6 +305,26 @@ public enum CLIParser {
         private mutating func loadCookieFiles() throws {
             for cookieFile in cookieFiles {
                 cookies.append(contentsOf: try CLIParser.loadCookies(from: cookieFile))
+            }
+        }
+
+        private mutating func loadBrowserCookies(using suppliedReader: (any BrowserCookieReader)?) throws {
+            guard let browserCookieBrowser else {
+                return
+            }
+
+            let source = BrowserCookieSource(browser: browserCookieBrowser, profile: browserProfile)
+            let reader = suppliedReader ?? source.makeReader()
+            do {
+                let browserCookies = try BrowserCookieLoader.load(source: source, reader: reader)
+                cookies = BrowserCookieLoader.merge(
+                    browserCookies: browserCookies,
+                    explicitCookies: cookies
+                )
+            } catch let error as BrowserCookieError {
+                throw ScraperError.browserCookieFailed(error.localizedDescription)
+            } catch {
+                throw ScraperError.browserCookieFailed("データベースの読み取りに失敗しました")
             }
         }
 
@@ -507,6 +566,8 @@ public enum CLIParser {
       --cookie <spec>                Cookie を 1 件追加
       --cookie-file <path>           Cookie JSON を読み込む
       --cookie-jar <path>            CookieJar JSON を読み込み、実行後に保存する
+      --browser-cookies <browser>    macOS Chrome または Firefox の Cookie を読み込む
+      --browser-profile <name|path>  ブラウザプロファイル名またはパス。未指定時は既定プロファイル
       --header <Name: Value>         HTTP ヘッダーを追加。複数指定可
       --persistent-store             永続 DataStore を使う
       --visibility <mode>            windowless | hidden-window | visible-window
@@ -548,6 +609,8 @@ public enum CLIParser {
       JSON array or object with keys:
       name, value, domain, path, secure, httpOnly, expires
       --cookie-jar は同じ JSON 形式を使い、保存時は JSON array で書き出します。
+      --browser-cookies は chrome|firefox のみ対応（Brave、Windows/Linux、Firefox コンテナは対象外）。
+      --browser-cookies と --cookie-jar は併用できません。--cookie / --cookie-file が優先されます。
     """
 
     static func parseHeader(_ raw: String) throws -> (String, String) {

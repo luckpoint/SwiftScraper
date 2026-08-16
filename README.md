@@ -6,6 +6,7 @@ macOS 標準の `WKWebView` を使って、JavaScript 実行後のページ内�
 ## 特徴
 - `WKWebView` ベースで JS レンダリング後の DOM を取得
 - `--cookie` / `--cookie-file` / `--cookie-jar` でセッション状態を注入・保存
+- macOS の Chrome / Firefox 既存プロファイルから `--browser-cookies` で Cookie を読み込み可能（Brave、Windows/Linux、Firefox コンテナは対象外）
 - `--header` でカスタム HTTP ヘッダーを追加（Accept-Language 等）
 - 固定待機、自動スクロール、セレクタ待機、テキスト待機、DOM 安定待機を組み合わせ可能
 - HTML 全体、`body` テキスト、特定要素、本文候補、構造確認レポートを抽出可能
@@ -56,6 +57,8 @@ swift run swift-scraper -- https://example.com
 --cookie <spec>                Cookie を 1 件追加
 --cookie-file <path>           Cookie JSON を読み込む
 --cookie-jar <path>            CookieJar JSON を読み込み、実行後に保存する
+--browser-cookies <browser>    macOS Chrome または Firefox の Cookie を読み込む
+--browser-profile <name|path>  ブラウザプロファイル名またはパス
 --header <Name: Value>         HTTP ヘッダーを追加。複数指定可
 --persistent-store             永続 DataStore を使う
 --visibility <mode>            windowless | hidden-window | visible-window
@@ -207,7 +210,22 @@ swift run swift-scraper -- \
 
 CookieJar の形式は `--cookie-file` と同じです。保存時は JSON array として出力します。`--sitemap` / `--url-file` の batch 実行では `--cookie-jar` は使用できません。
 
-### 9. カスタム HTTP ヘッダーを送る
+### 9. 既存ブラウザプロファイルの Cookie を使う
+
+macOS 13 以上の Chrome または Firefox が対象です。プロファイル名またはプロファイルディレクトリのパスを指定できます。省略時は Chrome の `Default`、Firefox の `profiles.ini` で既定になっているプロファイルを使います。
+
+```bash
+swift run swift-scraper -- \
+  https://example.com/dashboard \
+  --browser-cookies chrome \
+  --browser-profile "Profile 1"
+```
+
+Firefox は `profiles.ini` の相対/絶対 `Path` を解決します。Firefox コンテナ、partitioned Cookie、Brave、Windows/Linux のプロファイルは対象外です。Chrome は macOS Keychain の Chrome Safe Storage にアクセスでき、テスト済みの暗号化形式だけを復号できる場合に限り暗号化 Cookie を使います。Keychain 拒否や未対応形式では Cookie 値を出力せずエラーにします。
+
+ブラウザ Cookie の読み取りはコマンド単位で一度だけ行い、batch の各ページではメモリ上の Cookie 定義を URL の domain/path/expiry/secure 条件で適用します。`--cookie` と `--cookie-file` の明示 Cookie はブラウザ Cookie より優先され、`--browser-cookies` と `--cookie-jar` は併用できません。
+
+### 10. カスタム HTTP ヘッダーを送る
 ```bash
 swift run swift-scraper -- \
   https://example.com/docs \
@@ -217,7 +235,7 @@ swift run swift-scraper -- \
 
 ロケール検出でリダイレクトされるサイトに対して、`Accept-Language` ヘッダーで英語版を強制取得する場合などに使います。
 
-### 10. sitemap から batch 実行する
+### 11. sitemap から batch 実行する
 ```bash
 swift run swift-scraper -- \
   https://example.com \
@@ -228,7 +246,7 @@ swift run swift-scraper -- \
   --output out/sitemap-batch.json
 ```
 
-### 11. URL ファイルから batch 実行する
+### 12. URL ファイルから batch 実行する
 `urls.txt`:
 
 ```text
@@ -246,7 +264,7 @@ swift run swift-scraper -- \
   --output out/url-file-batch.json
 ```
 
-### 12. WebDriver BiDi bridge を起動する
+### 13. WebDriver BiDi bridge を起動する
 `--bidi-server` は SwiftNIO の WebSocket サーバを起動し、外部プログラムから JSON コマンドで同一プロセス内の `WKWebView` を操作できるようにします。endpoint は `ws://127.0.0.1:9222/session` です。
 
 ```bash

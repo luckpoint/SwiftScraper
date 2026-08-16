@@ -116,6 +116,9 @@ public struct CookieDefinition: Codable, Equatable, Sendable {
     public let secure: Bool
     public let httpOnly: Bool
     public let expires: Date?
+    /// `true` is used for browser cookies restricted to the exact host.
+    /// `nil` preserves the legacy explicit-cookie domain semantics.
+    public let hostOnly: Bool?
 
     public init(
         name: String,
@@ -124,7 +127,8 @@ public struct CookieDefinition: Codable, Equatable, Sendable {
         path: String = "/",
         secure: Bool = false,
         httpOnly: Bool = false,
-        expires: Date? = nil
+        expires: Date? = nil,
+        hostOnly: Bool? = nil
     ) {
         self.name = name
         self.value = value
@@ -133,6 +137,7 @@ public struct CookieDefinition: Codable, Equatable, Sendable {
         self.secure = secure
         self.httpOnly = httpOnly
         self.expires = expires
+        self.hostOnly = hostOnly
     }
 
     public init(cookie: HTTPCookie) {
@@ -367,6 +372,7 @@ public enum ScraperError: LocalizedError, Equatable, Sendable {
     case missingOptionValue(String)
     case invalidCookieSpec(String)
     case invalidCookieFile(String)
+    case browserCookieFailed(String)
     case cookieJarFailed(String)
     case loadFailed(String)
     case timedOut(phase: String, timeout: TimeInterval)
@@ -399,6 +405,8 @@ public enum ScraperError: LocalizedError, Equatable, Sendable {
             return "Cookie 指定が不正です: \(message)"
         case .invalidCookieFile(let message):
             return "Cookie ファイルを読み込めません: \(message)"
+        case .browserCookieFailed(let message):
+            return "ブラウザ Cookie を読み込めません: \(message)"
         case .cookieJarFailed(let message):
             return "CookieJar を扱えません: \(message)"
         case .loadFailed(let message):

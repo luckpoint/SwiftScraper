@@ -57,6 +57,7 @@ swift run swift-scraper -- \
 
 - `--cookie`
 - `--cookie-file`
+- `--browser-cookies chrome|firefox` / `--browser-profile <name|path>`
 - `--header`
 - `--wait-delay`
 - `--auto-scroll`
@@ -76,6 +77,7 @@ swift run swift-scraper -- \
 `--download-linked-pdfs` は通常 scrape の追加オプションなので、`--content-only`、`--markdown`、`--output`、`--sitemap`、`--url-file` などの通常 scrape オプションと併用できる。
 
 `--cookie-jar` は単一ページ実行では利用できるが、`--sitemap` / `--url-file` の batch 実行では利用できない。
+ブラウザ Cookie は macOS の Chrome/Firefox のみ対応し、`--cookie` / `--cookie-file` の明示 Cookie が優先される。`--browser-cookies` と `--cookie-jar` は併用できない。
 
 ## 保存先
 PDF は指定 root directory の下に、取得元ページの host と path を反映したディレクトリを作って保存する。

@@ -66,7 +66,6 @@ final class BiDiWebViewHost: NSObject {
 
     func start() async throws {
         presentation.activateIfNeeded()
-        try await injectCookies()
 
         if let initialURL = configuration.initialURL {
             _ = try await load(url: initialURL, wait: .complete)
@@ -88,6 +87,8 @@ final class BiDiWebViewHost: NSObject {
         guard activeNavigationID == nil else {
             throw BiDiProtocolError.invalidArgument("navigation is already in progress")
         }
+
+        try await injectCookies(for: url)
 
         let navigationID = UUID().uuidString
         activeNavigationID = navigationID
@@ -625,16 +626,17 @@ final class BiDiWebViewHost: NSObject {
         }
     }
 
-    private func injectCookies() async throws {
-        guard !configuration.cookies.isEmpty else {
+    private func injectCookies(for url: URL) async throws {
+        let cookies = configuration.cookies.filter { $0.matches(url: url) }
+        guard !cookies.isEmpty else {
             logger.info("BiDi Cookie injection skipped")
             return
         }
 
-        logger.info("BiDi Cookie injection: \(configuration.cookies.count)")
+        logger.info("BiDi Cookie injection: \(cookies.count)")
         let store = webView.configuration.websiteDataStore.httpCookieStore
 
-        for cookie in configuration.cookies {
+        for cookie in cookies {
             let httpCookie = try cookie.makeHTTPCookie()
             await store.setCookieAsync(httpCookie)
         }

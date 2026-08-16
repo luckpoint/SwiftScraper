@@ -76,7 +76,7 @@ public final class WebScraper: NSObject {
         let pdfLinks: PDFLinkCollection?
         if collectPDFLinks {
             let payload = try await evaluatePDFLinkPayload()
-            let cookies = await currentCookieDefinitions()
+            let cookies = try await cookiesForPDFLinks()
             pdfLinks = PDFLinkCollection(
                 sourceURL: webView.url ?? configuration.url,
                 links: payload.links,
@@ -103,7 +103,7 @@ public final class WebScraper: NSObject {
         try await loadPage()
         try await waitForRenderIfNeeded()
         let payload = try await evaluatePDFLinkPayload()
-        let cookies = await currentCookieDefinitions()
+        let cookies = try await cookiesForPDFLinks()
         try await saveCookieJarIfNeeded()
 
         return PDFLinkCollection(
@@ -116,11 +116,16 @@ public final class WebScraper: NSObject {
 
     private func injectCookies() async throws {
         let store = webView.configuration.websiteDataStore.httpCookieStore
-        var cookies = try loadCookieJarCookiesIfNeeded()
-        cookies.append(contentsOf: configuration.cookies)
+        let allCookies = try loadCookieJarCookiesIfNeeded() + configuration.cookies
+        let cookies = allCookies.filter { $0.matches(url: configuration.url) }
+
+        guard !allCookies.isEmpty else {
+            logger.info("Cookie 注入はありません")
+            return
+        }
 
         guard !cookies.isEmpty else {
-            logger.info("Cookie 注入はありません")
+            logger.info("対象 URL に一致する Cookie はありません")
             return
         }
 
@@ -162,6 +167,14 @@ public final class WebScraper: NSObject {
     private func currentCookieDefinitions() async -> [CookieDefinition] {
         let store = webView.configuration.websiteDataStore.httpCookieStore
         return await store.allCookies().map(CookieDefinition.init(cookie:))
+    }
+
+    private func cookiesForPDFLinks() async throws -> [CookieDefinition] {
+        let configuredCookies = try loadCookieJarCookiesIfNeeded() + configuration.cookies
+        return BrowserCookieLoader.mergeConfiguredCookiesWithStore(
+            configuredCookies: configuredCookies,
+            storeCookies: await currentCookieDefinitions()
+        )
     }
 
     private func loadPage() async throws {
