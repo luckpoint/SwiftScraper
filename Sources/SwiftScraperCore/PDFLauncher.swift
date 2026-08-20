@@ -47,7 +47,11 @@ public final class PDFLauncher {
         try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
         let renderer = PDFRenderer(logger: logger)
-        try renderer.render(html: html, outputURL: configuration.outputFile)
+        try renderer.render(
+            html: html,
+            outputURL: configuration.outputFile,
+            fontFamily: configuration.fontFamily
+        )
         logger.info("Saved: \(configuration.outputFile.path)", force: true)
     }
 

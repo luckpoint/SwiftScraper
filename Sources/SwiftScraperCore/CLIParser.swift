@@ -38,6 +38,12 @@ public enum CLIParser {
             case "--pdf":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 state.pdfInputPath = raw
+            case "--pdf-font-family":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    throw ScraperError.invalidArgument("`--pdf-font-family` must not be empty")
+                }
+                state.pdfFontFamily = raw
             case "--download-pdfs":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 guard state.pdfDownloadDirectory == nil else {
@@ -214,6 +220,7 @@ public enum CLIParser {
 
     private struct ParseState {
         var pdfInputPath: String?
+        var pdfFontFamily: String?
         var pdfDownloadDirectory: URL?
         var linkedPDFDownloadDirectory: URL?
         var bidiServer = false
@@ -309,6 +316,10 @@ public enum CLIParser {
                 return makePDFCommand(inputPath: pdfInputPath)
             }
 
+            if pdfFontFamily != nil {
+                throw ScraperError.invalidArgument("`--pdf-font-family` requires `--pdf`")
+            }
+
             if bidiServer { _ = try BiDiAccessGuard.loopbackHost(bidiHost) }
             try loadCookieFiles()
             try loadBrowserCookies(using: browserCookieReader)
@@ -360,7 +371,12 @@ public enum CLIParser {
                 outputFile = base.appendingPathExtension("pdf")
             }
 
-            return .pdf(PDFConfiguration(inputFile: inputFile, outputFile: outputFile, verbose: verbose))
+            return .pdf(PDFConfiguration(
+                inputFile: inputFile,
+                outputFile: outputFile,
+                fontFamily: pdfFontFamily,
+                verbose: verbose
+            ))
         }
 
         private func makePDFDownloadCommand(outputDirectory: URL) throws -> CLICommand {
@@ -628,6 +644,7 @@ public enum CLIParser {
       --image-debug                  Write image scores and reasons as JSON to stderr
       --pretty-print                 Format HTML output with SwiftSoup
       --pdf <file.md>                Convert a Markdown file to PDF
+      --pdf-font-family <family>     Font family to apply to PDF body text
       --verbose                      Write progress logs to stderr
       --version                      Show the version
       --help                         Show this help

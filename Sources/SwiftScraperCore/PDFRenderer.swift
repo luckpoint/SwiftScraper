@@ -9,13 +9,13 @@ public final class PDFRenderer {
         self.logger = logger
     }
 
-    public func render(html: String, outputURL: URL) throws {
+    public func render(html: String, outputURL: URL, fontFamily: String? = nil) throws {
         logger.info("Converting HTML to NSAttributedString")
         guard let htmlData = html.data(using: .utf8) else {
             throw ScraperError.pdfRenderFailed("Unable to convert the HTML to UTF-8 data")
         }
 
-        let attrStr = try NSAttributedString(
+        let parsedAttrStr = try NSAttributedString(
             data: htmlData,
             options: [
                 .documentType: NSAttributedString.DocumentType.html,
@@ -23,6 +23,8 @@ public final class PDFRenderer {
             ],
             documentAttributes: nil
         )
+
+        let attrStr = try applyingFontFamily(fontFamily, to: parsedAttrStr)
 
         let pageWidth: CGFloat = 595.28
         let pageHeight: CGFloat = 841.89
@@ -73,5 +75,32 @@ public final class PDFRenderer {
         guard printOp.run() else {
             throw ScraperError.pdfRenderFailed("The print operation failed")
         }
+    }
+
+    private func applyingFontFamily(
+        _ fontFamily: String?,
+        to attributedString: NSAttributedString
+    ) throws -> NSAttributedString {
+        guard let fontFamily else {
+            return attributedString
+        }
+        guard NSFontManager.shared.availableFontFamilies.contains(fontFamily) else {
+            throw ScraperError.pdfRenderFailed("The requested font family was not found: \(fontFamily)")
+        }
+
+        let result = NSMutableAttributedString(attributedString: attributedString)
+        let fullRange = NSRange(location: 0, length: attributedString.length)
+        attributedString.enumerateAttribute(.font, in: fullRange) { value, range, _ in
+            guard let sourceFont = value as? NSFont else {
+                return
+            }
+            let traits = sourceFont.fontDescriptor.symbolicTraits
+            if traits.contains(.monoSpace) {
+                return
+            }
+            let targetFont = NSFontManager.shared.convert(sourceFont, toFamily: fontFamily)
+            result.addAttribute(.font, value: targetFont, range: range)
+        }
+        return result
     }
 }

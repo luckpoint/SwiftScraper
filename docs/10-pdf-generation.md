@@ -12,6 +12,7 @@ Convert a Markdown file to HTML and generate a paginated PDF with macOS's native
 ## Inputs
 - Markdown file path
 - Output PDF path; when omitted, replace the input file extension with `.pdf`
+- Optional PDF body font family (`--pdf-font-family`); the font must be installed on the host generating the PDF
 
 ## Processing overview
 1. Read the Markdown file
@@ -20,6 +21,8 @@ Convert a Markdown file to HTML and generate a paginated PDF with macOS's native
 4. Convert HTML to an attributed string with `NSAttributedString(data:options:.html)`
 5. Calculate layout with `NSTextStorage`, `NSLayoutManager`, and `NSTextContainer`
 6. Place the content in `NSTextView` and save it as PDF with `NSPrintOperation`
+
+Use `--pdf-font-family "Noto Sans JP"` to apply a font family to the attributed string before printing, including when AppKit ignores the HTML/CSS font setting. Monospaced code fonts are preserved.
 
 ## Completion criteria
 - A multi-page PDF is written to the specified path

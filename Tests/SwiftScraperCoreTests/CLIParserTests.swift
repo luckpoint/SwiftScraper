@@ -645,6 +645,19 @@ final class CLIParserTests: XCTestCase {
         XCTAssertFalse(config.verbose)
     }
 
+    func testPDFFontFamilyParsing() throws {
+        let command = try CLIParser.parse(arguments: [
+            "--pdf", "notes.md",
+            "--pdf-font-family", "Noto Sans JP",
+        ])
+
+        guard case .pdf(let config) = command else {
+            return XCTFail("pdf command expected")
+        }
+
+        XCTAssertEqual(config.fontFamily, "Noto Sans JP")
+    }
+
     func testPDFCustomOutputPath() throws {
         let command = try CLIParser.parse(arguments: ["--pdf", "notes.md", "--output", "out/custom.pdf"])
 

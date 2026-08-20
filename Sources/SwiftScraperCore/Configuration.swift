@@ -275,11 +275,13 @@ extension ScraperConfiguration {
 public struct PDFConfiguration: Equatable, Sendable {
     public let inputFile: URL
     public let outputFile: URL
+    public let fontFamily: String?
     public let verbose: Bool
 
-    public init(inputFile: URL, outputFile: URL, verbose: Bool) {
+    public init(inputFile: URL, outputFile: URL, fontFamily: String? = nil, verbose: Bool) {
         self.inputFile = inputFile
         self.outputFile = outputFile
+        self.fontFamily = fontFamily
         self.verbose = verbose
     }
 }
