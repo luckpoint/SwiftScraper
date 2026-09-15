@@ -42,7 +42,14 @@ swift build -c release
 ```
 
 ### インストール
-Release ビルドを実行し、`~/.local/bin/swift-scraper` に配置する:
+Homebrew でインストールする（macOS Sequoia 以上、Xcode または Command Line Tools が必要）:
+
+```bash
+brew tap luckpoint/swift-scraper
+brew install swift-scraper
+```
+
+ソースから Release ビルドを実行し、`~/.local/bin/swift-scraper` に配置する:
 
 ```bash
 ./scripts/install.sh
@@ -382,6 +389,22 @@ batch 実行時の最終出力は JSON です。各ページの成功 / 失敗�
 - `0`: 成功
 - `1`: 実行時失敗、または batch 内に失敗ページあり
 - `2`: CLI 引数エラー
+
+## リリース
+1. `Sources/SwiftScraperCore/Version.swift` の `SwiftScraperVersion.current` を更新し、commit して main に push する
+2. 同じバージョンのタグを push する
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+タグを push すると `.github/workflows/release.yml` が動きます。タグと `SwiftScraperVersion.current` が一致すれば、[luckpoint/homebrew-swift-scraper](https://github.com/luckpoint/homebrew-swift-scraper) の formula の `url` と `sha256` を更新します。
+workflow には、tap に書き込める PAT を secret `HOMEBREW_TAP_GITHUB_TOKEN` として登録しておく必要があります。
+
+失敗時:
+- バージョン不一致（tap は更新されない）: `git tag -d v0.1.0 && git push --delete origin v0.1.0` → 定数を直して commit・push → 同じタグを付け直して push
+- formula 更新の失敗（PAT の期限切れなど）: `gh secret set HOMEBREW_TAP_GITHUB_TOKEN` → `gh run rerun <run-id> --failed`
 
 ## ドキュメント
 - [01. ページロード](docs/01-page-loading.md)
