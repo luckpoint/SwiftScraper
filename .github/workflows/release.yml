@@ -1,0 +1,24 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  homebrew:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify version matches tag
+        run: |
+          grep -qF "current = \"${GITHUB_REF_NAME#v}\"" Sources/SwiftScraperCore/Version.swift \
+            || { echo "::error::SwiftScraperVersion.current does not match tag ${GITHUB_REF_NAME}"; exit 1; }
+
+      - uses: mislav/bump-homebrew-formula-action@v4
+        with:
+          formula-name: swift-scraper
+          homebrew-tap: luckpoint/homebrew-swift-scraper
+        env:
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
