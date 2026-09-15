@@ -842,6 +842,25 @@ final class CLIParserTests: XCTestCase {
             )
         }
     }
+
+    func testVersionFlagReturnsCurrentVersion() throws {
+        XCTAssertEqual(try CLIParser.parse(arguments: ["--version"]), .version(SwiftScraperVersion.current))
+    }
+
+    func testVersionFlagIgnoresOtherArguments() throws {
+        XCTAssertEqual(
+            try CLIParser.parse(arguments: ["https://example.com", "--version"]),
+            .version(SwiftScraperVersion.current)
+        )
+    }
+
+    func testHelpTakesPrecedenceOverVersion() throws {
+        XCTAssertEqual(try CLIParser.parse(arguments: ["--version", "--help"]), .help(CLIParser.usage))
+    }
+
+    func testUsageMentionsVersionFlag() {
+        XCTAssertTrue(CLIParser.usage.contains("--version"))
+    }
 }
 
 final class ExtractionScriptTests: XCTestCase {

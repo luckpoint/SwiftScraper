@@ -7,8 +7,8 @@ struct SwiftScraperCLI {
     static func main() {
         do {
             switch try CLIParser.parse(arguments: Array(CommandLine.arguments.dropFirst())) {
-            case .help(let usage):
-                write(usage, to: FileHandle.standardOutput)
+            case .help(let text), .version(let text):
+                write(text, to: FileHandle.standardOutput)
                 Foundation.exit(0)
             case .run(let configuration):
                 let logger = StderrLogger(verbose: configuration.verbose)

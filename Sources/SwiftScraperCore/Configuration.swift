@@ -365,6 +365,7 @@ public struct BiDiServerConfiguration: Equatable, Sendable {
 
 public enum CLICommand: Equatable {
     case help(String)
+    case version(String)
     case run(ScraperConfiguration)
     case pdf(PDFConfiguration)
     case downloadPDFs(PDFDownloadConfiguration)

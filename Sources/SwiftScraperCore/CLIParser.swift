@@ -15,6 +15,10 @@ public enum CLIParser {
             return .help(usage)
         }
 
+        if normalizedArguments.contains("--version") {
+            return .version(SwiftScraperVersion.current)
+        }
+
         var state = ParseState()
 
         var index = 0
@@ -610,6 +614,7 @@ public enum CLIParser {
       --pretty-print                 HTML 系の出力を SwiftSoup で整形
       --pdf <file.md>                Markdown ファイルを PDF に変換
       --verbose                      stderr に進行ログを出す
+      --version                      バージョンを表示
       --help                         ヘルプを表示
 
     Cookie spec format:
