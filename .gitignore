@@ -3,4 +3,5 @@ node_modules/
 out/
 .DS_Store
 .claude/
+.artifacts/
 /skills/swiftscraper/SKILL.md
