@@ -1,106 +1,106 @@
-# 13. Knowledge Base 向け改善ロードマップ
+# 13. Knowledge Base Improvement Roadmap
 
-## 目的
-SwiftScraper を「動的ページを取得する CLI」から、「NotebookLM のようなナレッジベースへ投入するソースを安定収集する基盤」へ拡張する。
+## Purpose
+Extend SwiftScraper from a CLI that fetches dynamic pages into a foundation that reliably collects sources for a knowledge base such as NotebookLM.
 
-このドキュメントは、現在の合意事項と、未確定論点に対する推奨方針をまとめたロードマップである。
+This document summarizes current agreements and recommended policies for unresolved issues.
 
-## 対象テーマ
-- 4. 再クロールと差分更新
-- 5. 検索結果からの収集
-- 6. 運用耐性の強化
+## Scope
+- 4. Recrawling and incremental updates
+- 5. Collection from search results
+- 6. Stronger operational resilience
 
-## 現時点で確定している前提
-### プロダクトの責務
-- SwiftScraper の責務は `収集専用` とする
-- 検索、要約、対話 UI、ベクトル検索は外部システムの責務とする
+## Confirmed assumptions
+### Product responsibility
+- SwiftScraper is responsible for collection only
+- Search, summarization, conversational UI, and vector search belong to external systems
 
-### 最終成果物
-- ページ文書は `Markdown + manifest` を成果物とする
-- PDF は一次ソースとして保存し、ページ文書とは別文書として扱う
-- run ごとの不変 manifest を `runs/<run-id>/...` に保存する
+### Final artifacts
+- Page documents are delivered as `Markdown + manifest`
+- PDFs are stored as primary sources and treated as separate documents from page documents
+- An immutable manifest for each run is stored under `runs/<run-id>/...`
 
-### 入力と探索範囲
-- 収集ジョブの入口は `既知 URL 起点 + 検索クエリ起点` のハイブリッドとする
-- 検索結果からの収集対象は `allowlist ドメインのみ` とする
-- link expansion は `既定 1 hop`、実行時に `0-2 hop` を指定可能とする
-- 停止条件は `max-pages` と `max-pdfs` の二重上限とする
+### Inputs and discovery scope
+- Collection jobs accept both known URLs and search queries
+- Search-result collection is limited to allowlisted domains
+- Link expansion defaults to `1 hop`, with `0-2 hop` selectable at runtime
+- The stopping conditions are separate `max-pages` and `max-pdfs` limits
 
-### 収集優先順位
-- 大方針として `PDF 優先` とする
-- ただし HTML 親ページ経由で見つかった PDF は provenance を残す
-- direct PDF URL も収集対象に含める
+### Collection priority
+- The overall policy is `PDF first`
+- PDFs found through an HTML parent page retain their provenance
+- Direct PDF URLs are also collection targets
 
-### 文書モデル
-- ページ文書と PDF 文書は別々に出力する
-- ページ文書は `source_id + version_id` で管理する
-- PDF 文書も `source_id + version_id` で管理する
-- ページ文書の `version_id` は `content-only HTML` の hash とする
-- PDF 文書の `version_id` は PDF バイナリの `content_hash` とする
+### Document model
+- Page documents and PDF documents are output separately
+- Page documents are managed with `source_id + version_id`
+- PDF documents are also managed with `source_id + version_id`
+- A page document's `version_id` is the hash of its `content-only HTML`
+- A PDF document's `version_id` is the PDF binary's `content_hash`
 
-### 再クロール
-- run manifest とは別に、再クロール判定用の mutable `crawl state` を持つ
-- crawl state の主キーは `source_id` とする
-- `skip-unchanged` は `事前判定 + 取得後判定` とする
-- ただしページ文書は保守的に扱い、原則フル取得後に最終 hash で unchanged 判定する
+### Recrawling
+- Keep mutable `crawl state` for recrawl decisions separately from the run manifest
+- Use `source_id` as the crawl-state primary key
+- Implement `skip-unchanged` as a pre-fetch check plus a post-fetch check
+- Treat page documents conservatively and generally determine unchanged status from the final hash after a full fetch
 
-## 仕様メモ
-### ページ文書
-- `source_id` は `canonical or resolved URL` を軸にする
-- `origin_url` と `discovered_from` を保持する
-- 正本は `content-only HTML` とみなす
-- 最終成果物は Markdown と manifest である
-- `content-only` が空、または 300 文字未満ならページ文書は生成しない
-- 文書生成に失敗したページは failed artifact として保持する
+## Specification notes
+### Page documents
+- Base `source_id` on the canonical or resolved URL
+- Keep `origin_url` and `discovered_from`
+- Treat `content-only HTML` as the canonical source
+- The final artifact is Markdown plus a manifest
+- Do not generate a page document when `content-only` is empty or shorter than 300 characters
+- Keep pages that fail document generation as failed artifacts
 
-### PDF 文書
-- 正本は `.pdf` バイナリとする
-- manifest には `doc_id`, `pdf_url`, `downloaded_path`, `parent_page_url`, `link_text`, `content_hash`, `fetched_at` を持つ
-- `doc_id` は `source_id = normalized pdf_url` と `version_id = content_hash` の二層で扱う
-- 同一内容の PDF が複数の親から見つかった場合は 1 文書に集約し、`parents[]` を持つ
-- direct PDF の場合は `parent_page_url = null` を許可する
+### PDF documents
+- Treat the `.pdf` binary as canonical
+- The manifest contains `doc_id`, `pdf_url`, `downloaded_path`, `parent_page_url`, `link_text`, `content_hash`, and `fetched_at`
+- Model `doc_id` with two layers: `source_id = normalized pdf_url` and `version_id = content_hash`
+- If identical PDF content is found from multiple parents, consolidate it into one document with `parents[]`
+- For direct PDFs, allow `parent_page_url = null`
 
-## 依存関係
-3 テーマは独立ではなく、次の順で入れる。
+## Dependencies
+The three themes are not independent and should be introduced in this order:
 
-1. crawl state と run manifest
-2. `skip-unchanged` と差分更新
-3. discovery と allowlist 制御
-4. `.xml.gz`、retry、rate limit、robots などの運用耐性
+1. Crawl state and run manifest
+2. `skip-unchanged` and incremental updates
+3. Discovery and allowlist control
+4. Operational resilience such as `.xml.gz`, retry, rate limiting, and robots
 
-理由:
+Reasons:
 
-- discovery だけ先に入れても、run 単位の説明責任が弱い
-- 差分更新だけ先に入れても、入力起点が既知 URL に閉じる
-- 運用耐性が弱いまま探索を広げると失敗モードが読めない
+- Adding discovery first would leave run-level accountability weak
+- Adding incremental updates first would keep the input origin limited to known URLs
+- Expanding discovery before operational resilience would make failure modes difficult to understand
 
-## 推奨する未確定事項
-### 1. URL 正規化
-推奨:
+## Recommended unresolved decisions
+### 1. URL normalization
+Recommendation:
 
-- page は `rel=canonical` を優先し、なければ resolved URL を使う
-- `fragment` は除去する
-- `utm_*` など tracking query は除去する
-- host は小文字化する
-- path の明らかな正規化だけを行い、locale や同義 path の積極統合は避ける
+- For pages, prefer `rel=canonical`, otherwise use the resolved URL
+- Remove `fragment`
+- Remove tracking queries such as `utm_*`
+- Lowercase the host
+- Apply only obvious path normalization and avoid aggressively merging locale or synonymous paths
 
-理由:
+Reason:
 
-- source_id の誤統合を避けつつ、基本的な重複は抑えられる
+- This reduces basic duplication while avoiding incorrect merging of source IDs
 
-### 2. crawl state の保存方式
-推奨:
+### 2. Crawl-state storage
+Recommendation:
 
-- run artifact は JSON で不変保存
-- mutable crawl state は SQLite を推奨
+- Store run artifacts immutably as JSON
+- Use SQLite for mutable crawl state
 
-理由:
+Reasons:
 
-- `source_id` ごとの upsert と最新値参照が素直
-- 過去 run の監査と現在状態の責務を分離できる
+- Upserts and latest-value lookups by `source_id` are straightforward
+- Auditing past runs and representing current state remain separate responsibilities
 
-### 3. 不採用理由の taxonomy
-推奨:
+### 3. Rejection-reason taxonomy
+Recommendation:
 
 - `accepted`
 - `rejected_allowlist`
@@ -115,54 +115,54 @@ SwiftScraper を「動的ページを取得する CLI」から、「NotebookLM �
 - `timeout`
 - `robots_disallowed`
 
-理由:
+Reasons:
 
-- accepted / rejected / skipped を全部残す方針と相性がよい
-- 後続の監査、再試行、品質改善で使い回しやすい
+- This fits the policy of retaining all accepted, rejected, and skipped candidates
+- The same values can be reused for later auditing, retries, and quality improvements
 
-### 4. PDF 優先の具体的なスケジューリング
-推奨:
+### 4. Concrete PDF-first scheduling
+Recommendation:
 
-1. direct PDF seed / discovery 結果を先に確保する
-2. 明示 seed の HTML ページを取得する
-3. HTML 親ページから見つかった PDF を優先投入する
-4. hop 1 の HTML を処理する
-5. hop 2 の HTML を処理する
+1. Secure direct PDF seed and discovery results first
+2. Fetch explicit seed HTML pages
+3. Prioritize PDFs found from HTML parent pages
+4. Process hop 1 HTML
+5. Process hop 2 HTML
 
-理由:
+Reasons:
 
-- `PDF 優先` と `親ページ provenance` の両立がしやすい
-- 追加 HTML 探索で件数上限を食い潰しにくい
+- It balances the PDF-first policy with parent-page provenance
+- Additional HTML exploration is less likely to consume all item limits
 
 ### 5. robots.txt
-推奨:
+Recommendation:
 
-- 初期実装では `robots.txt` を明示的に解釈し、`Disallow` に反する URL は `robots_disallowed` として落とす
-- direct PDF URL も同じポリシーで判定する
+- In the initial implementation, interpret `robots.txt` explicitly and reject URLs that violate `Disallow` as `robots_disallowed`
+- Apply the same policy to direct PDF URLs
 
-理由:
+Reason:
 
-- allowlist のみであっても、継続収集では明示ルールがないと運用判断がぶれる
+- Even with an allowlist, ongoing collection needs explicit rules for consistent operational decisions
 
-## 実装順序
+## Implementation order
 ### P0
-- run manifest の標準 schema
-- page / pdf / failed artifact の source model
-- crawl state の導入
-- `.xml.gz` sitemap 対応
-- retry / backoff / ドメイン単位並列制御
+- Standard run manifest schema
+- Source models for page, PDF, and failed artifacts
+- Crawl-state introduction
+- `.xml.gz` sitemap support
+- Retry, backoff, and per-domain concurrency control
 
 ### P1
-- `--discover` と provider 抽象
-- allowlist 制御
-- accepted / rejected / skipped の記録
-- direct PDF と HTML 親ページ由来 PDF の provenance 統一
+- `--discover` and provider abstraction
+- Allowlist control
+- Recording accepted, rejected, and skipped candidates
+- Unified provenance for direct PDFs and PDFs found through HTML parent pages
 
 ### P2
-- `skip-unchanged` の事前判定改善
-- `robots.txt` の明示対応
-- 不採用理由の集計と run summary 強化
+- Improve pre-fetch `skip-unchanged` checks
+- Explicit `robots.txt` support
+- Aggregate rejection reasons and strengthen the run summary
 
-## 関連ドキュメント
-- [14. 検索結果からの収集](14-search-discovery.md)
-- [15. Knowledge Base ソース成果物仕様](15-kb-source-spec.md)
+## Related documents
+- [14. Search Result Discovery](14-search-discovery.md)
+- [15. Knowledge Base Source Artifact Specification](15-kb-source-spec.md)

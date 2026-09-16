@@ -1,59 +1,59 @@
-# 12. PDF リンクダウンロード
+# 12. PDF Link Download
 
-## 目的
-PDF リンク集ページや通常のスクレイピング対象ページを `WKWebView` で描画し、描画済み DOM 内の `.pdf` リンクを抽出してローカルへ保存する。
+## Purpose
+Render PDF index pages and ordinary scraping targets in `WKWebView`, extract `.pdf` links from the rendered DOM, and save them locally.
 
-PDF だけを保存する専用モードと、通常 scrape と同時に PDF も保存する sidecar モードがある。
+There are two modes: a dedicated mode that saves only PDFs, and a sidecar mode that saves PDFs alongside a normal scrape.
 
-| モード | 用途 | PDF 結果 |
+| Mode | Use | PDF result |
 | --- | --- | --- |
-| `--download-pdfs <dir>` | PDF リンク集から PDF だけを保存する | stdout の JSON |
-| `--download-linked-pdfs <dir>` | 通常 scrape を行いながら、ページ内 PDF も保存する | `<dir>/pdf-downloads.json` |
+| `--download-pdfs <dir>` | Save only PDFs from a PDF index page | JSON on stdout |
+| `--download-linked-pdfs <dir>` | Scrape normally and also save PDFs found on each page | `<dir>/pdf-downloads.json` |
 
-## 例
-単一ページの PDF リンク集を保存する:
+## Examples
+Save PDFs from a single PDF index page:
 
 ```bash
-swift run swift-scraper -- \
-  https://www.okta.com/legal/trustandcompliance/ \
-  --download-pdfs downloads \
+swift run swift-scraper -- \\
+  https://www.okta.com/legal/trustandcompliance/ \\
+  --download-pdfs downloads \\
   --auto-scroll
 ```
 
-sitemap で複数ページをたどり、各ページ内の PDF だけを保存する:
+Traverse multiple pages from a sitemap and save only their PDFs:
 
 ```bash
-swift run swift-scraper -- \
-  https://example.com \
-  --sitemap \
-  --download-pdfs downloads \
+swift run swift-scraper -- \\
+  https://example.com \\
+  --sitemap \\
+  --download-pdfs downloads \\
   --concurrency 4
 ```
 
-通常 scrape と同時に PDF も保存する:
+Save PDFs alongside a normal scrape:
 
 ```bash
-swift run swift-scraper -- \
-  https://example.com/docs \
-  --content-only \
-  --markdown \
-  --download-linked-pdfs downloads \
+swift run swift-scraper -- \\
+  https://example.com/docs \\
+  --content-only \\
+  --markdown \\
+  --download-linked-pdfs downloads \\
   --output out/docs.md
 ```
 
-URL ファイルの batch scrape と同時に PDF も保存する:
+Save PDFs alongside a batch scrape from a URL file:
 
 ```bash
-swift run swift-scraper -- \
-  --url-file urls.txt \
-  --content-only \
-  --markdown \
-  --download-linked-pdfs downloads \
+swift run swift-scraper -- \\
+  --url-file urls.txt \\
+  --content-only \\
+  --markdown \\
+  --download-linked-pdfs downloads \\
   --output out/pages.json
 ```
 
-## 入力
-共通で利用できるページロード補助オプション:
+## Inputs
+The following page-loading options are shared:
 
 - `--cookie`
 - `--cookie-file`
@@ -73,15 +73,15 @@ swift run swift-scraper -- \
 - `--persistent-store`
 - `--overwrite-pdfs`
 
-`--download-pdfs` は `--sitemap` / `--url-file` / `--concurrency` と併用できる。`--concurrency` は batch 入力と一緒に指定した場合だけ有効。
+`--download-pdfs` can be combined with `--sitemap`, `--url-file`, and `--concurrency`. `--concurrency` is effective only when used with batch input.
 
-`--download-linked-pdfs` は通常 scrape の追加オプションなので、`--content-only`、`--markdown`、`--output`、`--sitemap`、`--url-file` などの通常 scrape オプションと併用できる。
+`--download-linked-pdfs` is an additional normal-scrape option, so it can be combined with `--content-only`, `--markdown`, `--output`, `--sitemap`, and `--url-file`.
 
-`--cookie-jar` は単一ページ実行では利用できるが、`--sitemap` / `--url-file` の batch 実行では利用できない。
-ブラウザ Cookie は macOS の Chrome/Firefox のみ対応し、`--cookie` / `--cookie-file` の明示 Cookie が優先される。`--browser-cookies` と `--cookie-jar` は併用できない。
+`--cookie-jar` is available for single-page execution but cannot be used with `--sitemap` or `--url-file` batch execution.
+Browser cookies are supported only for macOS Chrome and Firefox. Explicit cookies from `--cookie` and `--cookie-file` take precedence, and `--browser-cookies` cannot be combined with `--cookie-jar`.
 
-## 保存先
-PDF は指定 root directory の下に、取得元ページの host と path を反映したディレクトリを作って保存する。
+## Output directory
+Under the specified root directory, PDFs are stored in a directory derived from the source page's host and path.
 
 ```text
 downloads/
@@ -91,23 +91,23 @@ downloads/
         <file>.pdf
 ```
 
-`https://www.okta.com/legal/trustandcompliance/` から抽出した PDF は、`downloads/www.okta.com/legal/trustandcompliance/` に保存される。
+A PDF extracted from `https://www.okta.com/legal/trustandcompliance/` is stored in `downloads/www.okta.com/legal/trustandcompliance/`.
 
-複数ページ実行ではページごとに source path が分かれるため、どのサイト・どのページから保存した PDF かをフォルダ構成から確認できる。
+For multiple pages, each source path gets its own directory, so the folder structure identifies the site and page that produced a PDF.
 
-## ファイル名
-ファイル名は次の規則で作る。
+## File names
+File names are generated as follows:
 
-1. PDF URL の最後の path component を元ファイル名として使う
-2. リンクテキストがある場合は `<リンクテキスト>-<元ファイル名>.pdf`
-3. リンクテキストは空白を正規化し、30文字で切り詰める
-4. リンクテキストが空の場合は元ファイル名だけを使う
-5. `/`、`\`、`:`、制御文字は `_` に置換する
-6. 同名ファイルがある場合は `-2`、`-3` のように連番を付ける
+1. Use the final path component of the PDF URL as the original file name
+2. When link text is present, use `<link text>-<original file name>.pdf`
+3. Normalize whitespace in link text and truncate it to 30 characters
+4. If link text is empty, use only the original file name
+5. Replace `/`, `\\`, `:`, and control characters with `_`
+6. Add `-2`, `-3`, and so on when a file with the same name already exists
 
-`--overwrite-pdfs` を指定した場合は、既存ファイルとの衝突では連番を付けず、同名ファイルを置き換える。同一実行内で同じファイル名になる PDF リンクが複数ある場合は、上書き指定時でも 2 件目以降に連番を付ける。
+With `--overwrite-pdfs`, replace an existing file with the same name instead of adding a suffix. If multiple PDF links produce the same name during one run, the second and later links still receive suffixes even with overwrite enabled.
 
-例:
+Examples:
 
 ```text
 Okta Model Card Governance Ana-okta-model-card-governance-analyzer-2026-02-13.pdf
@@ -115,35 +115,35 @@ report.pdf
 report-2.pdf
 ```
 
-## 処理概要
-1. 通常のスクレイピングと同じ `WKWebView` で対象ページをロードする
-2. Cookie、header、表示モード、viewport、待機オプションを適用する
-3. 描画待機後、`document.querySelectorAll('a[href]')` からリンクを列挙する
-4. `http:` / `https:` / `file:` の URL のうち、path が `.pdf` で終わるものだけを対象にする
-5. URL fragment を除去し、重複 URL を除外する
-6. `navigator.userAgent` から WKWebView の実 User-Agent を取得する
-7. WebKit の CookieStore に残っている Cookie を PDF ダウンロード request に反映する
-8. `URLSession` で PDF を取得し、取得元ページ別ディレクトリに保存する
-9. `--download-pdfs` は stdout に JSON を出力し、`--download-linked-pdfs` は `<dir>/pdf-downloads.json` に manifest を保存する
+## Processing overview
+1. Load the target page in the same `WKWebView` used for normal scraping
+2. Apply cookies, headers, visibility mode, viewport, and wait options
+3. After rendering waits, enumerate links with `document.querySelectorAll('a[href]')`
+4. Keep only `http:`, `https:`, or `file:` URLs whose path ends in `.pdf`
+5. Remove URL fragments and duplicate URLs
+6. Read the actual WKWebView user agent from `navigator.userAgent`
+7. Apply cookies remaining in WebKit's CookieStore to PDF download requests
+8. Download PDFs with `URLSession` and save them under the source page's directory
+9. `--download-pdfs` writes JSON to stdout; `--download-linked-pdfs` saves a manifest at `<dir>/pdf-downloads.json`
 
-`--download-linked-pdfs` ではページロードを二重に行わない。通常の抽出処理と同じ `WKWebView` 実行の中で PDF リンクも収集し、その後 PDF を保存する。
+`--download-linked-pdfs` does not load the page twice. It collects PDF links during the same `WKWebView` execution as normal extraction and saves the PDFs afterward.
 
-## User-Agent と Cookie
-PDF リンクの抽出は WKWebView の描画済み DOM から行い、PDF 本体の取得は `URLSession` で行う。
+## User-Agent and cookies
+PDF link extraction uses the rendered DOM in WKWebView, while PDF files are fetched with `URLSession`.
 
-`URLSession` の PDF download request には次の header を設定する。
+The `URLSession` PDF download request receives:
 
-- `--header` で指定された任意の header
-- `--header 'User-Agent: ...'` がある場合は、その User-Agent
-- `User-Agent` が未指定の場合は、WKWebView 内で取得した `navigator.userAgent`
-- WebKit の `WKWebsiteDataStore.httpCookieStore` から取得した Cookie のうち、PDF URL の domain / path / secure / expires 条件に合う Cookie
+- Any headers specified with `--header`
+- The value from `--header 'User-Agent: ...'` when provided
+- The `navigator.userAgent` read from WKWebView when no User-Agent was specified
+- Cookies from WebKit's `WKWebsiteDataStore.httpCookieStore` that match the PDF URL's domain, path, secure, and expiry rules
 
-Cookie は `Cookie` header として設定する。ただし `--header 'Cookie: ...'` が明示されている場合は、その値を優先し、自動生成した Cookie header は上書きしない。
+Cookies are sent in the `Cookie` header. If `--header 'Cookie: ...'` is explicitly set, that value takes precedence and the automatically generated Cookie header is not used.
 
-このため、ログイン後やロケール判定後に WebKit CookieStore に入った Cookie は PDF ダウンロードにも引き継がれる。一方、`URLSession` は WebKit と同じブラウザ download 機構ではないため、同等の header / Cookie を明示的に再構成している。
+As a result, cookies added to WebKit's CookieStore after login or locale detection are also used for PDF downloads. `URLSession` is not the same browser download mechanism as WebKit, so equivalent headers and cookies are reconstructed explicitly.
 
-## 出力 JSON
-`--download-pdfs` の単一ページ実行では、成功・失敗を含む全 PDF の結果を stdout に出力する。
+## Output JSON
+For a single-page `--download-pdfs` run, stdout contains every PDF result, including failures.
 
 ```json
 {
@@ -168,7 +168,7 @@ Cookie は `Cookie` header として設定する。ただし `--header 'Cookie: 
 }
 ```
 
-`--download-pdfs` の batch 実行と `--download-linked-pdfs` の manifest では、ページ単位の結果を含む JSON を出力する。
+Batch `--download-pdfs` and the `--download-linked-pdfs` manifest include per-page results.
 
 ```json
 {
@@ -198,16 +198,16 @@ Cookie は `Cookie` header として設定する。ただし `--header 'Cookie: 
 }
 ```
 
-終了コード:
+Exit codes:
 
-- `0`: ページ取得と PDF ダウンロードが成功、または PDF リンクが 0 件
-- `1`: ページ取得に失敗、保存先作成に失敗、または PDF の一部/全部の保存に失敗
-- `2`: CLI 引数エラー
+- `0`: page retrieval and PDF downloads succeeded, or there were no PDF links
+- `1`: page retrieval failed, the output directory could not be created, or some or all PDFs failed to save
+- `2`: CLI argument error
 
-`--download-linked-pdfs` では通常 scrape のページ失敗、または PDF ダウンロード失敗のどちらかがあれば終了コード 1 になる。通常 scrape の出力先と PDF manifest は分離される。
+With `--download-linked-pdfs`, exit code 1 is returned if either normal scraping or PDF downloading has a failure. Normal scrape output and the PDF manifest are kept separate.
 
-## 併用できないオプション
-`--download-pdfs` は PDF 専用モードなので、通常の抽出出力とは分離している。
+## Incompatible options
+`--download-pdfs` is a PDF-only mode and is separate from normal extraction output.
 
 - `--pdf`
 - `--bidi-server`
@@ -225,41 +225,41 @@ Cookie は `Cookie` header として設定する。ただし `--header 'Cookie: 
 - `--image-debug`
 - `--pretty-print`
 
-`--download-linked-pdfs` は通常 scrape の追加オプションだが、次のモードとは併用できない。
+`--download-linked-pdfs` is an additional normal-scrape option but cannot be combined with:
 
 - `--pdf`
 - `--bidi-server`
 - `--download-pdfs`
 
-## 制約
-- `href` の path が `.pdf` で終わるリンクだけを対象にする。リダイレクト先が PDF になる download endpoint は対象外。
-- PDF の `Content-Type` は検証しない。HTTP status が 2xx なら保存する。
-- BiDi server の download 制御ではなく、CLI の 1 shot / batch mode として実装している。
+## Constraints
+- Only links whose `href` path ends in `.pdf` are selected. Download endpoints that redirect to a PDF are not supported.
+- PDF `Content-Type` is not validated. A response is saved when its HTTP status is 2xx.
+- This is implemented as a CLI one-shot or batch mode, not as download control in the BiDi server.
 
-## 将来の対応候補
-`.pdf` で終わらない download endpoint から PDF が返るサイトへの対応は、将来の候補として残す。対応時期は未決定で、必要が出た時点で検討する。
+## Future candidates
+Support for sites where a non-`.pdf` download endpoint returns a PDF remains a future candidate. There is no scheduled implementation date; it can be considered when needed.
 
-全リンクに対して `HEAD` / `GET` を実行すると負荷と時間が大きくなりやすいため、実装する場合は opt-in の軽量 probe として設計する。
+Sending `HEAD` or `GET` to every link can add significant load and latency, so any implementation should be an opt-in, lightweight probe.
 
-想定案:
+Possible design:
 
-1. 既存の `.pdf` path 判定は即採用する
-2. `.pdf` で終わらないリンクは DOM 情報から PDF らしい候補に絞る
-3. 絞った候補だけ `HEAD` を試す
-4. `HEAD` が 405 / 403 / 情報不足の場合だけ `Range: bytes=0-1023` 付きの `GET` を試す
-5. `Content-Type: application/pdf` または `Content-Disposition` の PDF filename から PDF と判定できたものだけ保存対象に昇格する
+1. Continue accepting links with a `.pdf` path immediately
+2. Use DOM information to narrow non-`.pdf` links to likely PDF candidates
+3. Try `HEAD` only for those candidates
+4. If `HEAD` returns 405, 403, or insufficient information, try `GET` with `Range: bytes=0-1023`
+5. Promote only responses identified as PDFs by `Content-Type: application/pdf` or a PDF filename in `Content-Disposition`
 
-候補絞り込みの例:
+Examples of candidate signals:
 
 - `a[download]`
 - `a[type="application/pdf"]`
-- `href`、link text、`aria-label`、`title` に `pdf` / `download` / `report` / `document` / `whitepaper` などが含まれる
-- `/download`、`/asset`、`/file`、`/documents/` など download endpoint らしい path
+- `pdf`, `download`, `report`, `document`, or `whitepaper` in `href`, link text, `aria-label`, or `title`
+- Paths resembling download endpoints, such as `/download`, `/asset`, `/file`, or `/documents/`
 
-安全弁の例:
+Possible safeguards:
 
-- デフォルトでは現状維持し、明示オプションでのみ probe する
-- 1 ページあたりの probe 件数上限を設ける
-- 短い timeout と低い concurrency を使う
-- batch 全体で probe 結果を cache する
-- 同一 URL は fragment 除去後に 1 回だけ probe する
+- Keep current behavior by default and enable probing only with an explicit option
+- Cap the number of probes per page
+- Use short timeouts and low concurrency
+- Cache probe results across the batch
+- Probe each URL only once after removing its fragment

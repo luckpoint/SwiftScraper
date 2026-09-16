@@ -1,78 +1,78 @@
-# 10. PDF 生成
+# 10. PDF Generation
 
-## 目的
-Markdown ファイルを HTML に変換し、macOS ネイティブのレイアウトエンジンでページネーション付き PDF を生成する。
+## Purpose
+Convert a Markdown file to HTML and generate a paginated PDF with macOS's native layout engine.
 
-## 要件
-- Markdown ファイルを入力として A4 サイズの PDF を出力できること
-- 大きなドキュメント（数万行）でもページネーションされた複数ページ PDF を生成できること
-- ヘッダー・フッターなしのミニマムフォーマットであること
-- Chromium や外部ツールに依存しないこと
+## Requirements
+- Accept a Markdown file and produce an A4 PDF
+- Generate a multi-page, paginated PDF for large documents with tens of thousands of lines
+- Use a minimal format without headers or footers
+- Avoid dependencies on Chromium or external tools
 
-## 入力
-- Markdown ファイルパス
-- 出力 PDF ファイルパス（省略時は入力ファイル名の拡張子を `.pdf` に置換）
+## Inputs
+- Markdown file path
+- Output PDF path; when omitted, replace the input file extension with `.pdf`
 
-## 処理概要
-1. Markdown ファイルを読み込む
-2. Ink で Markdown → HTML に変換する
-3. 最小限の CSS を含む HTML テンプレートで包む
-4. `NSAttributedString(data:options:.html)` で HTML → 属性付き文字列に変換する
-5. `NSTextStorage` + `NSLayoutManager` + `NSTextContainer` でレイアウトを計算する
-6. `NSTextView` に配置し、`NSPrintOperation` で PDF として保存する
+## Processing overview
+1. Read the Markdown file
+2. Convert Markdown to HTML with Ink
+3. Wrap it in an HTML template with minimal CSS
+4. Convert HTML to an attributed string with `NSAttributedString(data:options:.html)`
+5. Calculate layout with `NSTextStorage`, `NSLayoutManager`, and `NSTextContainer`
+6. Place the content in `NSTextView` and save it as PDF with `NSPrintOperation`
 
-## 完了条件
-- 指定パスに複数ページの PDF ファイルが出力されること
+## Completion criteria
+- A multi-page PDF is written to the specified path
 
-## WKWebView を使った PDF 生成の検証結果
+## Results of validating PDF generation with WKWebView
 
-開発過程で WKWebView による PDF 生成を検証した。結論として **大きなドキュメントの PDF 化には WKWebView は適さない** ことが判明した。
+WKWebView-based PDF generation was evaluated during development. The conclusion was that **WKWebView is unsuitable for converting large documents to PDF**.
 
-### 検証 1: `WKWebView.createPDF(configuration:)`
+### Test 1: `WKWebView.createPDF(configuration:)`
 
-`createPDF` は Web コンテンツのスナップショットを PDF 化する API であり、**ページネーション（複数ページ分割）を行わない**。
+`createPDF` is an API that turns a snapshot of web content into a PDF; it does **not paginate content across multiple pages**.
 
-| `WKPDFConfiguration.rect` | 挙動 |
+| `WKPDFConfiguration.rect` | Behavior |
 |---|---|
-| `.zero`（デフォルト） | コンテンツ全体を **1 ページ** の PDF に収める。コンテンツが大きすぎると `WKErrorDomain Code=1` で失敗する |
-| A4 サイズ等を明示指定 | 指定した矩形領域のみをキャプチャする。**先頭の 1 ページ分しか出力されない** |
+| `.zero` (default) | Fits all content on **one page**. If the content is too large, it fails with `WKErrorDomain Code=1` |
+| Explicit A4 size or similar | Captures only the specified rectangle. **Only the first page is produced** |
 
-小さなドキュメント（数千行以下）であれば `.zero` で問題なく動作するが、1MB 超のドキュメントではエラーになった。
+Small documents, generally a few thousand lines or fewer, work with `.zero`, but documents larger than 1 MB failed.
 
-### 検証 2: `NSPrintOperation(view: WKWebView)`
+### Test 2: `NSPrintOperation(view: WKWebView)`
 
-WKWebView を `NSPrintOperation` に渡す方法も試したが、**WKWebView のレンダリングは別プロセス（WebContent プロセス）で行われるため**、NSView の印刷パイプラインではオフスクリーンのコンテンツにアクセスできない。結果として表示領域分（1 ページ分）のみが出力された。
+Passing WKWebView to `NSPrintOperation` was also tested. Because WKWebView renders in a separate WebContent process, the NSView printing pipeline cannot access off-screen content. As a result, only the visible area, roughly one page, was output.
 
-### 検証 3: `NSAttributedString(html)` + `NSTextView`（採用）
+### Test 3: `NSAttributedString(html)` + `NSTextView` (adopted)
 
-AppKit の `NSAttributedString(data:options:.html)` で HTML を属性付き文字列に変換し、`NSTextView` + `NSPrintOperation` で PDF 化する方法を採用した。
+The adopted approach converts HTML to an attributed string with AppKit's `NSAttributedString(data:options:.html)`, then creates the PDF with `NSTextView` and `NSPrintOperation`.
 
-- `NSTextContainer` の高さを `.greatestFiniteMagnitude` に設定し、全テキストをレイアウトさせる
-- `NSLayoutManager.ensureLayout(for:)` でレイアウトを確定させる
-- `NSPrintOperation` が `NSTextView` のページネーション機構（`knowsPageRange(_:)` / `rectForPage(_:)`）を利用して複数ページを生成する
+- Set the height of `NSTextContainer` to `.greatestFiniteMagnitude` so all text is laid out
+- Finalize layout with `NSLayoutManager.ensureLayout(for:)`
+- Let `NSPrintOperation` use `NSTextView`'s pagination methods (`knowsPageRange(_:)` / `rectForPage(_:)`) to generate multiple pages
 
-このアプローチで 1.2MB / 22,000 行のドキュメントが 319 ページの PDF として正常に出力された。
+With this approach, a 1.2 MB, 22,000-line document was successfully written as a 319-page PDF.
 
-### CSS の再現度
+### CSS fidelity
 
-`NSAttributedString(data:options:.html)` は内部で旧 WebKit を使用しており、モダン CSS の再現度は WKWebView より低い。ただし、以下のような基本的なスタイリングは問題なく適用される:
+`NSAttributedString(data:options:.html)` uses an older WebKit internally, so its support for modern CSS is lower than WKWebView's. The following basic styles are applied reliably:
 
-- フォントファミリー・サイズ
-- 見出し（h1〜h6）
-- コードブロック・インラインコード
-- テーブル
-- リスト
-- ブロック引用
+- Font family and size
+- Headings (h1 through h6)
+- Code blocks and inline code
+- Tables
+- Lists
+- Block quotes
 
-## WKWebView で大きなドキュメントの PDF を作成したい場合の対応策
+## Options for creating large PDFs with WKWebView
 
-WKWebView のレンダリング品質（CSS Grid、Flexbox、Web フォント等）が必要な場合は、以下の方法が考えられる。
+When WKWebView rendering quality such as CSS Grid, Flexbox, or web fonts is required, consider the following approaches.
 
-### 方法 A: ドキュメント分割 + PDF 結合
+### Method A: Split the document and merge PDFs
 
-1. Markdown を見出し単位（例: `# ` レベル）で分割する
-2. 各チャンクを個別に HTML 化し、`WKWebView.createPDF(configuration:)` で PDF Data を取得する
-3. `PDFKit` の `PDFDocument` を使って全チャンクの PDF を結合する
+1. Split Markdown at heading boundaries, such as level `# `
+2. Convert each chunk to HTML and obtain PDF data with `WKWebView.createPDF(configuration:)`
+3. Merge all chunk PDFs with `PDFKit`'s `PDFDocument`
 
 ```swift
 import PDFKit
@@ -91,14 +91,14 @@ for chunkHTML in chunks {
 merged.write(to: outputURL)
 ```
 
-各チャンクが `createPDF` の上限を超えないサイズに収まるよう分割する必要がある。WKWebView の再利用にはページロード → `didFinish` → `createPDF` のサイクルを繰り返す。
+Each chunk must stay below the size at which `createPDF` fails. Reusing WKWebView requires repeating the page load, `didFinish`, and `createPDF` cycle.
 
-### 方法 B: JavaScript によるページ分割
+### Method B: Split pages with JavaScript
 
-1. HTML にページサイズ相当の CSS を設定する（`@media print` + `@page`）
-2. WKWebView でロード後、JavaScript でコンテンツの総高さを取得する
-3. ページ高さごとに `createPDF(configuration:)` を `rect` を変えて呼び出す
-4. `PDFKit` で結合する
+1. Set page-size CSS in the HTML with `@media print` and `@page`
+2. After loading in WKWebView, obtain the total content height with JavaScript
+3. Call `createPDF(configuration:)` for each page height with a different `rect`
+4. Merge the results with `PDFKit`
 
 ```swift
 let totalHeight = try await webView.evaluateJavaScript(
@@ -110,19 +110,19 @@ while y < totalHeight {
     let config = WKPDFConfiguration()
     config.rect = CGRect(x: 0, y: y, width: 595.28, height: min(pageHeight, totalHeight - y))
     let data = try await webView.pdf(configuration: config)
-    // PDFKit で結合
+    // Merge with PDFKit
     y += pageHeight
 }
 ```
 
-ただしページ境界でテキストが途中で切れる問題があり、適切な分割位置の検出が必要になる。
+Text can be cut at page boundaries, so suitable split positions must be detected.
 
-### 方法 C: ヘッドレスプリント（将来の可能性）
+### Method C: Headless printing (future possibility)
 
-macOS の将来のバージョンで WKWebView にプログラマティックな印刷 API（ページネーション対応の PDF 出力）が追加される可能性はあるが、現時点（macOS 15 まで）では提供されていない。
+Future macOS versions may add a programmatic, paginated printing API for WKWebView. As of macOS 15, no such API is available.
 
-## 注意点
-- `NSAttributedString(data:options:.html)` はメインスレッドで呼ぶ必要がある
-- `NSPrintOperation.run()` はモーダルに実行される（CFRunLoop をブロックする）
-- `NSPrintOperation` で PDF 保存する場合、出力先は `jobSavingURL` で `NSPrintInfo` に設定する
-- `WKWebView.createPDF` は印刷 API ではなくスナップショット API であるという認識が重要
+## Notes
+- `NSAttributedString(data:options:.html)` must be called on the main thread
+- `NSPrintOperation.run()` executes modally and blocks the CFRunLoop
+- When saving a PDF with `NSPrintOperation`, set the output path on `NSPrintInfo` through `jobSavingURL`
+- It is important to treat `WKWebView.createPDF` as a snapshot API rather than a printing API

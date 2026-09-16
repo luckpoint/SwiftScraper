@@ -1,208 +1,208 @@
 # SwiftScraper
 
-macOS 標準の `WKWebView` を使って、JavaScript 実行後のページ内容を取得する Swift 製 CLI です。  
-単純な `URLSession` 取得では取り切れない動的ページを、Cookie 注入、描画待機、本文抽出、Markdown 変換、batch 実行付きで扱います。
+A Swift CLI that uses macOS's native `WKWebView` to capture page content after JavaScript execution.
+It handles dynamic pages that a simple `URLSession` fetch cannot fully retrieve, with cookie injection, rendering waits, content extraction, Markdown conversion, and batch execution.
 
-## 特徴
-- `WKWebView` ベースで JS レンダリング後の DOM を取得
-- `--cookie` / `--cookie-file` / `--cookie-jar` でセッション状態を注入・保存
-- macOS の Chrome / Firefox 既存プロファイルから `--browser-cookies` で Cookie を読み込み可能（Brave、Windows/Linux、Firefox コンテナは対象外）
-- `--header` でカスタム HTTP ヘッダーを追加（Accept-Language 等）
-- 固定待機、自動スクロール、セレクタ待機、テキスト待機、DOM 安定待機を組み合わせ可能
-- HTML 全体、`body` テキスト、特定要素、本文候補、構造確認レポートを抽出可能
-- HTML の pretty print と Markdown 変換に対応
-- 画像候補の特徴量を JS で集め、Swift の heuristic でロゴや UI 画像を落とせる
-- `sitemap.xml` または URL ファイルから複数ページを batch 実行可能
-- PDF リンク集ページから `.pdf` リンクを抽出し、サイト別フォルダに保存可能
-- SwiftNIO の WebSocket サーバで WKWebView を操作する WebDriver BiDi 風 bridge を起動可能
-- `windowless` / `hidden-window` / `visible-window` で露出度を切り替え可能
+## Features
+- Capture the post-JavaScript-rendered DOM with `WKWebView`
+- Inject and save session state with `--cookie`, `--cookie-file`, and `--cookie-jar`
+- Load cookies from existing macOS Chrome or Firefox profiles with `--browser-cookies` (Brave, Windows/Linux, and Firefox containers are unsupported)
+- Add custom HTTP headers such as `Accept-Language` with `--header`
+- Combine fixed waits, automatic scrolling, selector waits, text waits, and DOM stability waits
+- Extract the full HTML, `body` text, selected elements, likely content, or a structure inspection report
+- Pretty-print HTML and convert HTML to Markdown
+- Collect image features with JavaScript and use Swift heuristics to remove logos and UI images
+- Run batches from `sitemap.xml` or a URL file
+- Extract `.pdf` links from PDF index pages and save them in site-specific directories
+- Start a WebDriver BiDi-style bridge over a SwiftNIO WebSocket server to control WKWebView
+- Select the level of exposure with `windowless`, `hidden-window`, or `visible-window`
 
-## 動作要件
-- macOS 13 以上
+## Requirements
+- macOS 13 or later
 - Swift 6.0
 
-`WKWebView` と AppKit を使うため、macOS 専用です。  
-完全な headless ブラウザではなく、ユーザー露出を抑えた実行を目指す設計です。
+Because it uses `WKWebView` and AppKit, SwiftScraper runs only on macOS.
+The design aims to minimize user exposure rather than provide a fully headless browser.
 
-## ビルド
+## Build
 ```bash
 swift build
 ```
 
-release build:
+Release build:
 
 ```bash
 swift build -c release
 ```
 
-生成バイナリ:
+Generated binary:
 
 ```bash
 .build/release/swift-scraper
 ```
 
-### インストール
-Homebrew でインストールする（macOS Sequoia 以上、Xcode または Command Line Tools が必要）:
+### Installation
+Install with Homebrew (macOS Sequoia or later, with Xcode or the Command Line Tools):
 
 ```bash
 brew tap luckpoint/swift-scraper
 brew install swift-scraper
 ```
 
-ソースから Release ビルドを実行し、`~/.local/bin/swift-scraper` に配置する:
+Build a release from source and install it at `~/.local/bin/swift-scraper`:
 
 ```bash
 ./scripts/install.sh
 ```
 
-インストール先を変更する場合は `BIN_DIR` を指定する:
+Set `BIN_DIR` to change the installation directory:
 
 ```bash
 BIN_DIR="$HOME/bin" ./scripts/install.sh
 ```
 
-## 実行方法
-### 基本
+## Usage
+### Basic
 ```bash
 swift run swift-scraper -- https://example.com
 ```
 
-`swift run` 経由では `--` を入れて、CLI オプションをその後ろに渡します。
+When invoked through `swift run`, include `--` before the CLI options.
 
-### 主なオプション
+### Main options
 ```text
---bidi-server                 WKWebView BiDi bridge server を起動
---bidi-host <host>            BiDi server の bind host。既定 127.0.0.1
---bidi-port <port>            BiDi server の bind port。既定 9222
---cookie <spec>                Cookie を 1 件追加
---cookie-file <path>           Cookie JSON を読み込む
---cookie-jar <path>            CookieJar JSON を読み込み、実行後に保存する
---browser-cookies <browser>    macOS Chrome または Firefox の Cookie を読み込む
---browser-profile <name|path>  ブラウザプロファイル名またはパス
---header <Name: Value>         HTTP ヘッダーを追加。複数指定可
---persistent-store             永続 DataStore を使う
+--bidi-server                 Start the WKWebView BiDi bridge server
+--bidi-host <host>            BiDi server bind host; defaults to 127.0.0.1
+--bidi-port <port>            BiDi server bind port; defaults to 9222
+--cookie <spec>               Add one cookie
+--cookie-file <path>          Load cookies from JSON
+--cookie-jar <path>           Load CookieJar JSON and save it after execution
+--browser-cookies <browser>   Load cookies from macOS Chrome or Firefox
+--browser-profile <name|path> Browser profile name or path
+--header <Name: Value>        Add an HTTP header; may be specified multiple times
+--persistent-store             Use a persistent DataStore
 --visibility <mode>            windowless | hidden-window | visible-window
---viewport <width>x<height>    WebView サイズ。既定 1440x900
---wait-delay <seconds>         didFinish 後の固定待機
---auto-scroll                  lazy load 補助のため下方向へ自動スクロール
---wait-selector <css>          CSS セレクタ出現待機。複数指定可
---wait-text <text>             テキスト出現待機。複数指定可
---poll-interval <seconds>      条件待機のポーリング間隔。既定 0.5
---dom-stable-delay <seconds>   DOM が安定したとみなす時間。既定 0.5
---load-timeout <seconds>       ロード段階タイムアウト。既定 30
---wait-timeout <seconds>       描画待機タイムアウト。既定 15
---js-timeout <seconds>         JavaScript 実行タイムアウト。既定 10
---download-pdfs <directory>    ページ内の PDF リンクを保存
---download-linked-pdfs <dir>   通常抽出と同時にページ内の PDF リンクを保存
---overwrite-pdfs               既存 PDF を連番回避せず同名で上書き
---output <path>                標準出力ではなくファイルへ保存
---body-text                    document.body.innerText を抽出
---selector-inner-html <css>    特定要素の innerHTML を抽出
---content-only                 本文候補の HTML を抽出
---inspect-structure            本文候補とランドマーク情報だけを確認
---markdown                     HTML 系抽出結果を Markdown に変換
---extract-images               画像 heuristic を適用して HTML 系出力の画像を絞り込む
+--viewport <width>x<height>    WebView size; defaults to 1440x900
+--wait-delay <seconds>         Fixed wait after didFinish
+--auto-scroll                  Scroll downward to help trigger lazy loading
+--wait-selector <css>          Wait for a CSS selector; may be specified multiple times
+--wait-text <text>             Wait for text; may be specified multiple times
+--poll-interval <seconds>      Condition polling interval; defaults to 0.5
+--dom-stable-delay <seconds>   Time before the DOM is considered stable; defaults to 0.5
+--load-timeout <seconds>       Load-stage timeout; defaults to 30
+--wait-timeout <seconds>       Rendering wait timeout; defaults to 15
+--js-timeout <seconds>         JavaScript execution timeout; defaults to 10
+--download-pdfs <directory>    Save PDF links found on the page
+--download-linked-pdfs <dir>   Save PDF links alongside normal extraction
+--overwrite-pdfs               Replace existing PDFs instead of avoiding name collisions
+--output <path>                Save to a file instead of standard output
+--body-text                    Extract document.body.innerText
+--selector-inner-html <css>    Extract innerHTML from selected elements
+--content-only                 Extract the likely content HTML
+--inspect-structure            Inspect content candidates and landmark information
+--markdown                     Convert HTML extraction results to Markdown
+--extract-images               Apply image heuristics to HTML output
 --image-filter <mode>          all | article-only
---image-score-threshold <0-1>  keep 判定の閾値。既定 0.65
---image-include-maybe          maybe 判定の画像も出力に残す
---image-debug                  画像スコアと理由を stderr に JSON で出す
---pretty-print                 HTML 系出力を整形
---verbose                      stderr に進行ログを出す
---sitemap                      sitemap.xml をたどって batch 実行
---url-file <path>              URL 一覧ファイルを使って batch 実行
---concurrency <count>          batch 並列数。既定 4
+--image-score-threshold <0-1>  Keep threshold; defaults to 0.65
+--image-include-maybe          Keep images classified as maybe
+--image-debug                  Write image scores and reasons as JSON to stderr
+--pretty-print                 Format HTML output
+--verbose                      Write progress logs to stderr
+--sitemap                      Follow sitemap.xml for batch execution
+--url-file <path>              Use a URL list file for batch execution
+--concurrency <count>          Batch concurrency; defaults to 4
 ```
 
-## 使い方
-### 1. HTML 全体を取得
+## Examples
+### 1. Extract the full HTML
 ```bash
 swift run swift-scraper -- https://example.com --output out/page.html
 ```
 
-### 2. 本文候補だけを Markdown 化
+### 2. Convert likely content to Markdown
 ```bash
-swift run swift-scraper -- \
-  https://example.com/article \
-  --content-only \
-  --markdown \
+swift run swift-scraper -- \\
+  https://example.com/article \\
+  --content-only \\
+  --markdown \\
   --output out/article.md
 ```
 
-### 3. 描画待機を入れる
+### 3. Wait for rendering
 ```bash
-swift run swift-scraper -- \
-  https://example.com/app \
-  --auto-scroll \
-  --wait-selector "#app" \
-  --wait-text "Loaded" \
-  --wait-timeout 20 \
+swift run swift-scraper -- \\
+  https://example.com/app \\
+  --auto-scroll \\
+  --wait-selector "#app" \\
+  --wait-text "Loaded" \\
+  --wait-timeout 20 \\
   --dom-stable-delay 1.0
 ```
 
-### 4. 本文画像だけを残す
+### 4. Keep only content images
 ```bash
-swift run swift-scraper -- \
-  https://example.com/article \
-  --content-only \
-  --markdown \
-  --extract-images \
-  --image-filter article-only \
+swift run swift-scraper -- \\
+  https://example.com/article \\
+  --content-only \\
+  --markdown \\
+  --extract-images \\
+  --image-filter article-only \\
   --image-debug
 ```
 
-`--extract-images` を付けると、HTML / Markdown 化の前に画像 heuristic を適用し、`drop` 判定の画像を出力から除去します。`--image-debug` はスコアと理由を stderr へ JSON で出します。
+With `--extract-images`, image heuristics run before HTML or Markdown conversion and images classified as `drop` are removed from the output. `--image-debug` writes scores and reasons as JSON to stderr.
 
-### 5. PDF リンク集から PDF を保存する
+### 5. Save PDFs from a PDF index page
 ```bash
-swift run swift-scraper -- \
-  https://www.okta.com/legal/trustandcompliance/ \
-  --download-pdfs downloads \
+swift run swift-scraper -- \\
+  https://www.okta.com/legal/trustandcompliance/ \\
+  --download-pdfs downloads \\
   --auto-scroll
 ```
 
-PDF は `downloads/<host>/<source-path>/` に保存されます。上の例では `downloads/www.okta.com/legal/trustandcompliance/` です。
+PDFs are saved under `downloads/<host>/<source-path>/`. In this example, the directory is `downloads/www.okta.com/legal/trustandcompliance/`.
 
-ファイル名はリンクテキストと元ファイル名から作ります。リンクテキストは空白を正規化し、30文字に切り詰めます。リンクテキストが空なら元ファイル名だけを使います。
+File names are built from the link text and original file name. Link text is whitespace-normalized and truncated to 30 characters. If the link text is empty, only the original file name is used.
 
 ```text
 Okta Model Card Governance Ana-okta-model-card-governance-analyzer-2026-02-13.pdf
 ```
 
-同名ファイルが既にある場合、通常は `-2`、`-3` のように連番を付けて保存します。既存 PDF を同名で置き換えたい場合は `--overwrite-pdfs` を指定します。同一実行内に同じファイル名になるリンクが複数ある場合は、上書き指定時でも 2 件目以降に連番を付けます。
+When a file with the same name already exists, a suffix such as `-2` or `-3` is normally added. Use `--overwrite-pdfs` to replace an existing PDF with the same name. If multiple links produce the same name in one run, the second and later files receive numeric suffixes even with overwrite enabled.
 
-実行結果は stdout に JSON で出力され、保存先、成功件数、失敗件数、各 PDF の URL と保存パスを確認できます。`--cookie` / `--cookie-file` / `--cookie-jar` / `--header` / 待機系オプションは PDF リンク抽出にも利用できます。
+The result is written as JSON to stdout and includes the output directory, success and failure counts, and the URL and path for each PDF. `--cookie`, `--cookie-file`, `--cookie-jar`, `--header`, and rendering wait options also apply to PDF link extraction.
 
-PDF 本体のダウンロードは `URLSession` で行います。Cookie は描画後の `WKWebsiteDataStore.httpCookieStore` から取得し、PDF URL に合うものを `Cookie` ヘッダーへ反映します。`User-Agent` は `--header 'User-Agent: ...'` があればその値を優先し、未指定の場合は WKWebView 内の `navigator.userAgent` を取得して PDF ダウンロード request に設定します。
+PDF files are downloaded with `URLSession`. Cookies are read from `WKWebsiteDataStore.httpCookieStore` after rendering and matching cookies are applied to the `Cookie` header for the PDF URL. If `--header 'User-Agent: ...'` is set, that value takes precedence; otherwise, the WebView's `navigator.userAgent` is read and added to the PDF request.
 
-`--download-pdfs` は `--sitemap` / `--url-file` と併用できます。各ページを描画して PDF リンクだけを保存し、batch の PDF ダウンロード結果 JSON を stdout へ出力します。
+`--download-pdfs` can be combined with `--sitemap` or `--url-file`. Each page is rendered, only its PDF links are saved, and the batch PDF download result JSON is written to stdout.
 
 ```bash
-swift run swift-scraper -- \
-  https://example.com \
-  --sitemap \
-  --download-pdfs downloads \
+swift run swift-scraper -- \\
+  https://example.com \\
+  --sitemap \\
+  --download-pdfs downloads \\
   --concurrency 4
 ```
 
-通常の抽出結果も欲しい場合は `--download-linked-pdfs <dir>` を使います。通常 scrape の stdout / `--output` はそのまま維持し、PDF ダウンロード結果は `<dir>/pdf-downloads.json` に保存します。
+To keep the normal extraction result as well, use `--download-linked-pdfs <dir>`. Normal scrape output on stdout or at `--output` is preserved, and the PDF download result is saved to `<dir>/pdf-downloads.json`.
 
 ```bash
-swift run swift-scraper -- \
-  https://example.com/docs \
-  --content-only \
-  --markdown \
-  --download-linked-pdfs downloads \
+swift run swift-scraper -- \\
+  https://example.com/docs \\
+  --content-only \\
+  --markdown \\
+  --download-linked-pdfs downloads \\
   --output out/docs.md
 ```
 
-### 6. Cookie を直接注入する
+### 6. Inject a cookie directly
 ```bash
-swift run swift-scraper -- \
-  https://example.com/dashboard \
+swift run swift-scraper -- \\
+  https://example.com/dashboard \\
   --cookie 'name=session;value=abc123;domain=example.com;path=/;secure=true;httpOnly=true'
 ```
 
-### 7. Cookie JSON を使う
+### 7. Use a cookie JSON file
 ```json
 [
   {
@@ -217,59 +217,59 @@ swift run swift-scraper -- \
 ```
 
 ```bash
-swift run swift-scraper -- \
-  https://example.com/dashboard \
+swift run swift-scraper -- \\
+  https://example.com/dashboard \\
   --cookie-file cookies.json
 ```
 
-### 8. CookieJar JSON を使う
-`--cookie-jar` は指定ファイルが存在すればロード前に Cookie を注入し、実行後に WebKit の CookieStore に残っている Cookie を同じJSONファイルへ保存します。ファイルが存在しない場合は空の CookieJar として扱い、実行後に作成します。
+### 8. Use a CookieJar JSON file
+If the file passed to `--cookie-jar` exists, cookies are injected before loading and the cookies remaining in WebKit's CookieStore are saved back to the same JSON file after execution. If the file does not exist, it is treated as an empty CookieJar and created after execution.
 
 ```bash
-swift run swift-scraper -- \
-  https://example.com/dashboard \
+swift run swift-scraper -- \\
+  https://example.com/dashboard \\
   --cookie-jar cookies.json
 ```
 
-CookieJar の形式は `--cookie-file` と同じです。保存時は JSON array として出力します。`--sitemap` / `--url-file` の batch 実行では `--cookie-jar` は使用できません。
+CookieJar uses the same format as `--cookie-file` and is written as a JSON array. It cannot be used for batch execution with `--sitemap` or `--url-file`.
 
-### 9. 既存ブラウザプロファイルの Cookie を使う
+### 9. Use cookies from an existing browser profile
 
-macOS 13 以上の Chrome または Firefox が対象です。プロファイル名またはプロファイルディレクトリのパスを指定できます。省略時は Chrome の `Default`、Firefox の `profiles.ini` で既定になっているプロファイルを使います。
+macOS 13 or later is supported with Chrome and Firefox. You may specify a profile name or profile directory path. If omitted, Chrome's `Default` profile or Firefox's default profile from `profiles.ini` is used.
 
 ```bash
-swift run swift-scraper -- \
-  https://example.com/dashboard \
-  --browser-cookies chrome \
+swift run swift-scraper -- \\
+  https://example.com/dashboard \\
+  --browser-cookies chrome \\
   --browser-profile "Profile 1"
 ```
 
-Firefox は `profiles.ini` の相対/絶対 `Path` を解決します。Firefox コンテナ、partitioned Cookie、Brave、Windows/Linux のプロファイルは対象外です。Chrome は macOS Keychain の Chrome Safe Storage にアクセスでき、テスト済みの暗号化形式だけを復号できる場合に限り暗号化 Cookie を使います。Keychain 拒否や未対応形式では Cookie 値を出力せずエラーにします。
+Firefox resolves relative and absolute `Path` values from `profiles.ini`. Firefox containers, partitioned cookies, Brave, and Windows/Linux profiles are unsupported. Chrome encrypted cookies can be used only when SwiftScraper can access Chrome Safe Storage in the macOS Keychain and decrypt a tested encryption format. Keychain denial or unsupported formats produces an error without printing cookie values.
 
-ブラウザ Cookie の読み取りはコマンド単位で一度だけ行い、batch の各ページではメモリ上の Cookie 定義を URL の domain/path/expiry/secure 条件で適用します。`--cookie` と `--cookie-file` の明示 Cookie はブラウザ Cookie より優先され、`--browser-cookies` と `--cookie-jar` は併用できません。
+Browser cookies are read once per command. For each batch page, the in-memory cookie definitions are applied according to the URL's domain, path, expiry, and secure rules. Explicit cookies from `--cookie` and `--cookie-file` take precedence over browser cookies, and `--browser-cookies` cannot be combined with `--cookie-jar`.
 
-### 10. カスタム HTTP ヘッダーを送る
+### 10. Send custom HTTP headers
 ```bash
-swift run swift-scraper -- \
-  https://example.com/docs \
-  --header 'Accept-Language: en,en-US;q=0.9' \
+swift run swift-scraper -- \\
+  https://example.com/docs \\
+  --header 'Accept-Language: en,en-US;q=0.9' \\
   --header 'X-Custom-Header: value'
 ```
 
-ロケール検出でリダイレクトされるサイトに対して、`Accept-Language` ヘッダーで英語版を強制取得する場合などに使います。
+Use this to force an English version with `Accept-Language` on sites that redirect according to locale detection.
 
-### 11. sitemap から batch 実行する
+### 11. Run a batch from a sitemap
 ```bash
-swift run swift-scraper -- \
-  https://example.com \
-  --sitemap \
-  --content-only \
-  --markdown \
-  --concurrency 8 \
+swift run swift-scraper -- \\
+  https://example.com \\
+  --sitemap \\
+  --content-only \\
+  --markdown \\
+  --concurrency 8 \\
   --output out/sitemap-batch.json
 ```
 
-### 12. URL ファイルから batch 実行する
+### 12. Run a batch from a URL file
 `urls.txt`:
 
 ```text
@@ -280,33 +280,33 @@ https://example.com/three
 ```
 
 ```bash
-swift run swift-scraper -- \
-  --url-file urls.txt \
-  --inspect-structure \
-  --concurrency 3 \
+swift run swift-scraper -- \\
+  --url-file urls.txt \\
+  --inspect-structure \\
+  --concurrency 3 \\
   --output out/url-file-batch.json
 ```
 
-### 13. WebDriver BiDi bridge を起動する
-`--bidi-server` は SwiftNIO の WebSocket サーバを起動し、外部プログラムから JSON コマンドで同一プロセス内の `WKWebView` を操作できるようにします。endpoint は `ws://127.0.0.1:9222/session` です。
+### 13. Start the WebDriver BiDi bridge
+`--bidi-server` starts a SwiftNIO WebSocket server so external programs can control the `WKWebView` in the same process with JSON commands. The endpoint is `ws://127.0.0.1:9222/session`.
 
 ```bash
-swift run swift-scraper -- \
-  --bidi-server \
-  --bidi-port 9222 \
+swift run swift-scraper -- \\
+  --bidi-server \\
+  --bidi-port 9222 \\
   --verbose
 ```
 
-初期 URL を指定する場合:
+To specify an initial URL:
 
 ```bash
-swift run swift-scraper -- \
-  --bidi-server \
-  --url https://example.com \
+swift run swift-scraper -- \\
+  --bidi-server \\
+  --url https://example.com \\
   --visibility hidden-window
 ```
 
-対応する主な method:
+Main supported methods:
 - `session.status`
 - `browsingContext.getTree`
 - `browsingContext.navigate`
@@ -332,32 +332,32 @@ swift run swift-scraper -- \
 - `swiftScraper:scrape.getCookies` / `scrape.getCookies`
 - `log.entryAdded` event
 
-P0/P1 と SwiftScraper scraping extension を外部サイト依存なしで確認する場合:
+To verify P0/P1 and the SwiftScraper scraping extension without depending on external sites:
 
 ```bash
 npm run puppeteer:bidi-p1
 ```
 
-これは WKWebView を WebSocket 経由で操作する scraping 用 bridge です。Chrome や Firefox の WebDriver BiDi と完全互換のブラウザ実装ではありません。詳細は [11. WebDriver BiDi bridge](docs/11-webdriver-bidi-bridge.md) を参照してください。
+This bridge controls WKWebView over WebSocket for scraping. It is not a fully compatible Chrome or Firefox WebDriver BiDi browser implementation. See [11. WebDriver BiDi Bridge](docs/11-webdriver-bidi-bridge.md) for details.
 
-## 抽出モード
-| モード | 説明 |
+## Extraction modes
+| Mode | Description |
 | --- | --- |
-| 既定 | `document.documentElement.outerHTML` |
+| Default | `document.documentElement.outerHTML` |
 | `--body-text` | `document.body.innerText` |
-| `--selector-inner-html <css>` | 一致要素の `innerHTML` |
-| `--content-only` | 本文候補だけを抽出 |
-| `--inspect-structure` | 本文候補、ランドマーク数、除去情報をテキストレポート化 |
+| `--selector-inner-html <css>` | `innerHTML` of matching elements |
+| `--content-only` | Extract likely content only |
+| `--inspect-structure` | Produce a text report of content candidates, landmark counts, and removal details |
 
-制約:
-- `--markdown` は HTML を返す抽出モードでだけ使えます
-- `--extract-images` は HTML を返す抽出モードでだけ使えます
-- `--markdown` と `--pretty-print` は同時指定できません
-- `--selector-inner-html` は対象要素が見つからないとエラーになります
-- `--auto-scroll` は文書全体のスクロールにだけ効き、内部スクロールコンテナには別対応が必要な場合があります
+Constraints:
+- `--markdown` is available only for extraction modes that return HTML
+- `--extract-images` is available only for extraction modes that return HTML
+- `--markdown` and `--pretty-print` cannot be used together
+- `--selector-inner-html` fails when the target element is not found
+- `--auto-scroll` affects only document-level scrolling; internal scroll containers may need separate handling
 
-## batch 出力
-batch 実行時の最終出力は JSON です。各ページの成功 / 失敗が `pages[]` に入ります。
+## Batch output
+The final output of batch execution is JSON. Each page's success or failure appears in `pages[]`.
 
 ```json
 {
@@ -379,54 +379,54 @@ batch 実行時の最終出力は JSON です。各ページの成功 / 失敗�
       "url": "https://example.com/two",
       "success": false,
       "output": null,
-      "error": "ページロードに失敗しました"
+      "error": "Page load failed"
     }
   ]
 }
 ```
 
-終了コード:
-- `0`: 成功
-- `1`: 実行時失敗、または batch 内に失敗ページあり
-- `2`: CLI 引数エラー
+Exit codes:
+- `0`: success
+- `1`: runtime failure or at least one failed page in the batch
+- `2`: CLI argument error
 
-## リリース
-1. `Sources/SwiftScraperCore/Version.swift` の `SwiftScraperVersion.current` を更新し、commit して main に push する
-2. 同じバージョンのタグを push する
+## Release
+1. Update `SwiftScraperVersion.current` in `Sources/SwiftScraperCore/Version.swift`, commit, and push to `main`
+2. Push a tag with the same version
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-タグを push すると `.github/workflows/release.yml` が動きます。タグと `SwiftScraperVersion.current` が一致すれば、[luckpoint/homebrew-swift-scraper](https://github.com/luckpoint/homebrew-swift-scraper) の formula の `url` と `sha256` を更新します。
-workflow には、tap に書き込める PAT を secret `HOMEBREW_TAP_GITHUB_TOKEN` として登録しておく必要があります。
+Pushing the tag starts `.github/workflows/release.yml`. If the tag matches `SwiftScraperVersion.current`, the workflow updates the formula's `url` and `sha256` in [luckpoint/homebrew-swift-scraper](https://github.com/luckpoint/homebrew-swift-scraper).
+The workflow needs a PAT that can write to the tap, stored as the `HOMEBREW_TAP_GITHUB_TOKEN` secret.
 
-失敗時:
-- バージョン不一致（tap は更新されない）: `git tag -d v0.1.0 && git push --delete origin v0.1.0` → 定数を直して commit・push → 同じタグを付け直して push
-- formula 更新の失敗（PAT の期限切れなど）: `gh secret set HOMEBREW_TAP_GITHUB_TOKEN` → `gh run rerun <run-id> --failed`
+On failure:
+- Version mismatch (the tap is not updated): `git tag -d v0.1.0 && git push --delete origin v0.1.0` → fix the constant, commit and push, then recreate and push the same tag
+- Formula update failure (for example, an expired PAT): `gh secret set HOMEBREW_TAP_GITHUB_TOKEN` → `gh run rerun <run-id> --failed`
 
-## ドキュメント
-- [01. ページロード](docs/01-page-loading.md)
-- [02. Cookie 注入](docs/02-cookie-injection.md)
-- [03. レンダリング待機](docs/03-rendering-wait.md)
-- [04. HTML / DOM 取得](docs/04-html-dom-extraction.md)
-- [05. ユーザー露出の抑制](docs/05-user-visibility-control.md)
-- [06. 安定性とタイムアウト制御](docs/06-stability-and-timeout.md)
-- [07. デバッグ運用](docs/07-debug-operability.md)
-- [08. Batch 実行](docs/08-batch-processing.md)
-- [09. 画像抽出と heuristic](docs/09-image-extraction.md)
-- [10. PDF 生成](docs/10-pdf-generation.md)
-- [11. WebDriver BiDi bridge](docs/11-webdriver-bidi-bridge.md)
-- [12. PDF リンクダウンロード](docs/12-pdf-link-download.md)
-- [13. Knowledge Base 向け改善ロードマップ](docs/13-knowledge-base-roadmap.md)
-- [14. 検索結果からの収集](docs/14-search-discovery.md)
-- [15. Knowledge Base ソース成果物仕様](docs/15-kb-source-spec.md)
+## Documentation
+- [01. Page Loading](docs/01-page-loading.md)
+- [02. Cookie Injection](docs/02-cookie-injection.md)
+- [03. Rendering Wait](docs/03-rendering-wait.md)
+- [04. HTML / DOM Extraction](docs/04-html-dom-extraction.md)
+- [05. Limiting User Exposure](docs/05-user-visibility-control.md)
+- [06. Stability and Timeout Control](docs/06-stability-and-timeout.md)
+- [07. Debug Operability](docs/07-debug-operability.md)
+- [08. Batch Processing](docs/08-batch-processing.md)
+- [09. Image Extraction and Heuristics](docs/09-image-extraction.md)
+- [10. PDF Generation](docs/10-pdf-generation.md)
+- [11. WebDriver BiDi Bridge](docs/11-webdriver-bidi-bridge.md)
+- [12. PDF Link Download](docs/12-pdf-link-download.md)
+- [13. Knowledge Base Improvement Roadmap](docs/13-knowledge-base-roadmap.md)
+- [14. Search Result Discovery](docs/14-search-discovery.md)
+- [15. Knowledge Base Source Artifact Specification](docs/15-kb-source-spec.md)
 
-## 制約
-- macOS 専用です
-- gzip 圧縮された sitemap (`.xml.gz`) は URL 判定のみ対応で、中身の展開は未対応です
-- `windowless` / `hidden-window` は露出を抑えるためのモードで、完全 headless を保証するものではありません
-- 画像 heuristic の初期実装はページ単位判定までです。batch 頻度補正やドメイン別 blacklist は未実装です
-- `--download-pdfs` / `--download-linked-pdfs` は `href` の path が `.pdf` で終わるリンクだけを対象にします。`.pdf` で終わらない download endpoint 対応は将来候補で、対応時期は未決定です
-- WebDriver BiDi bridge は scraping 用 subset であり、WebDriver BiDi 仕様の完全実装ではありません
+## Constraints
+- macOS only
+- Gzip-compressed sitemaps (`.xml.gz`) are recognized by URL but their contents are not decompressed
+- `windowless` and `hidden-window` reduce exposure but do not guarantee a fully headless environment
+- The initial image heuristic implementation makes decisions per page; batch frequency adjustment and domain-specific blacklists are not implemented
+- `--download-pdfs` and `--download-linked-pdfs` target only links whose `href` path ends in `.pdf`. Support for download endpoints whose paths do not end in `.pdf` is a future candidate with no scheduled implementation date
+- The WebDriver BiDi bridge is a scraping subset rather than a full WebDriver BiDi implementation

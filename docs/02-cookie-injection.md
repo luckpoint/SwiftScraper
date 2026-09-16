@@ -1,59 +1,59 @@
-# 02. Cookie 注入
+# 02. Cookie Injection
 
-## 目的
-対象サイトの認証状態やセッション状態を再現するため、ページロード前に必要な Cookie を `WKHTTPCookieStore` へ注入する。
+## Purpose
+Inject the cookies required to reproduce the target site's authentication or session state into `WKHTTPCookieStore` before loading the page.
 
-## 要件
-- ロード前に任意の Cookie を挿入できること
-- CLI から個別指定と JSON ファイル指定の両方を扱えること
-- ドメイン、パス、`Secure` 属性などを適切に指定できること
-- Cookie 注入完了後にのみページロードを開始すること
+## Requirements
+- Insert arbitrary cookies before loading
+- Support both individual CLI values and JSON files
+- Set the domain, path, `Secure` attribute, and related fields correctly
+- Start page loading only after cookie injection has completed
 
-## 入力
+## Inputs
 - `--cookie <spec>`
 - `--cookie-file <path>`
 - `--cookie-jar <path>`
 - `--browser-cookies chrome|firefox`
 - `--browser-profile <profile-name-or-path>`
-- Cookie 名
-- Cookie 値
-- ドメイン
-- パス
-- 有効期限や `Secure` / `HttpOnly` 属性などの付加情報
+- Cookie name
+- Cookie value
+- Domain
+- Path
+- Additional values such as expiry and `Secure` / `HttpOnly` attributes
 
-## 実装済み入力形式
-- `--cookie` は `name=session;value=abc123;domain=example.com;path=/;secure=true;httpOnly=true;expires=2026-12-31T00:00:00Z` 形式を受け付ける
-- `--cookie-file` は単一オブジェクトまたは配列 JSON を受け付ける
-- `--cookie-jar` は同じ JSON 形式を読み込み、実行後に CookieStore の内容を JSON 配列として保存する
-- `--browser-cookies chrome|firefox` は既存の macOS ブラウザプロファイルから Cookie を読み込み、メモリ上で `CookieDefinition` に変換する
-- Chrome は標準の macOS プロファイル（`~/Library/Application Support/Google/Chrome`）を読み、`--browser-profile` に `Default` / `Profile 1` などの名前、またはプロファイルディレクトリのパスを指定できる
-- Firefox は標準の macOS `profiles.ini` を解決し、相対 `Path` と絶対 `Path` の両方に対応する。`--browser-profile` は `Name` またはディレクトリパスで指定できる
-- Chrome の暗号化 Cookie は macOS Keychain の Chrome Safe Storage と、テスト済みの `v10` 形式だけを使って復号する。Keychain 拒否や未対応形式では値を表示せず失敗する
-- ブラウザ Cookie の読み取りはコマンド単位で一度だけ行い、batch の各ページでは DB を再読込しない
-- Firefox の `originAttributes` が空でない Cookie、Chrome の partitioned Cookie は別コンテナへ適用しないため読み込まない
-- `expires` は ISO8601 文字列として扱う
-- `--cookie` / `--cookie-file` はブラウザ Cookie より優先される
-- `--browser-cookies` と `--cookie-jar` は併用できない
-- `--cookie-jar` は batch 実行では使用できない
+## Implemented input formats
+- `--cookie` accepts `name=session;value=abc123;domain=example.com;path=/;secure=true;httpOnly=true`
+- `--cookie-file` accepts either a single JSON object or a JSON array
+- `--cookie-jar` reads the same JSON format and saves the CookieStore contents as a JSON array after execution
+- `--browser-cookies chrome|firefox` reads an existing macOS browser profile and converts cookies to `CookieDefinition` values in memory
+- Chrome reads the standard macOS profile directory (`~/Library/Application Support/Google/Chrome`). `--browser-profile` accepts names such as `Default` or `Profile 1`, or a profile directory path
+- Firefox resolves the standard macOS `profiles.ini` and supports both relative and absolute `Path` values. `--browser-profile` accepts a `Name` or a directory path
+- Encrypted Chrome cookies are decrypted only with Chrome Safe Storage from the macOS Keychain and the tested `v10` format. Keychain denial or unsupported formats fail without exposing the value
+- Browser cookies are read once per command; batch pages do not reload the database
+- Firefox cookies with non-empty `originAttributes` and partitioned Chrome cookies are not loaded because they are not applied to a separate container
+- `expires` is handled as an ISO 8601 string
+- Explicit `--cookie` / `--cookie-file` cookies take precedence over browser cookies
+- `--browser-cookies` and `--cookie-jar` cannot be used together
+- `--cookie-jar` cannot be used for batch execution
 
-対応範囲は macOS 13 以上の Chrome と Firefox のみである。Brave、Windows/Linux、Firefox コンテナ Cookie は対象外であり、CLI でも受け付けない。
+The supported scope is macOS 13 or later with Chrome and Firefox. Brave, Windows/Linux profiles, and Firefox container cookies are unsupported and rejected by the CLI.
 
-## 処理概要
-1. `WKWebsiteDataStore` から `WKHTTPCookieStore` を取得する
-2. `--cookie-jar` が指定され、ファイルが存在する場合は Cookie 定義を読み込む
-3. `--browser-cookies` が指定された場合はブラウザ DB を一度だけ読み、Cookie 定義を明示 Cookie と統合する
-4. 対象 URL に対して domain、path、expiry、secure を適用し、必要な Cookie だけを `HTTPCookie` として組み立てる
-5. `setCookie` で順次注入する
-6. 完了コールバックを待ってからロード処理へ進む
-7. `--cookie-jar` が指定された場合は、実行後に CookieStore の内容を同じファイルへ保存する
+## Processing overview
+1. Get `WKHTTPCookieStore` from `WKWebsiteDataStore`
+2. If `--cookie-jar` is set and the file exists, load the cookie definitions
+3. If `--browser-cookies` is set, read the browser database once and merge its cookie definitions with explicit cookies
+4. Apply the domain, path, expiry, and secure rules for the target URL and construct the required `HTTPCookie` values
+5. Inject them sequentially with `setCookie`
+6. Wait for the completion callback before starting the load
+7. If `--cookie-jar` is set, save the CookieStore contents back to the same file after execution
 
-## 完了条件
-- 必要な Cookie が Cookie Store に反映され、ロードを開始してよい状態になること
+## Completion criteria
+- The required cookies are reflected in the Cookie Store and loading may begin
 
-## 注意点
-- `Secure` 付き Cookie は HTTPS 前提となる
-- ドメインやパスの不整合があると期待通りに送信されない
-- `--cookie-file` は help にあるキー構成に合わせた JSON を前提にする
-- `--cookie-jar` の保存形式は JSON 配列で、`SameSite` など `CookieDefinition` にない属性は保持しない
-- Cookie 値はログ、標準出力、エラー、デバッグ JSON、レポートへ出力しない
-- サイトによっては Cookie だけでなく `localStorage` や CSRF token が必要になる
+## Notes
+- Cookies with `Secure` require HTTPS
+- Domain or path mismatches can prevent cookies from being sent as expected
+- `--cookie-file` expects the JSON keys documented by the help output
+- `--cookie-jar` is saved as a JSON array and does not preserve attributes unavailable in `CookieDefinition`, such as `SameSite`
+- Cookie values are never written to logs, stdout, errors, debug JSON, or reports
+- Some sites require `localStorage` or a CSRF token in addition to cookies

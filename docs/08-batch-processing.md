@@ -1,68 +1,68 @@
-# 08. Batch 実行
+# 08. Batch Processing
 
-## 目的
-複数 URL をまとめて解決し、同じ待機条件・抽出条件で一括スクレイピングする。
+## Purpose
+Resolve multiple URLs and scrape them in one run with the same wait and extraction conditions.
 
-## 要件
-- `sitemap` または URL 一覧ファイルから対象 URL 群を解決できること
-- 重複 URL を除去しつつ、入力順をなるべく保てること
-- 並列数を制御しながら各ページを独立に処理できること
-- ページ単位の成功 / 失敗を集計できること
-- 最終結果を JSON として保存または標準出力へ返せること
+## Requirements
+- Resolve target URLs from a sitemap or a URL list file
+- Remove duplicate URLs while preserving input order as much as possible
+- Process pages independently while controlling concurrency
+- Aggregate per-page success and failure
+- Save the final result as JSON or return it on standard output
 
-## 入力
+## Inputs
 - `--sitemap`
 - `--url-file <path>`
-- `--concurrency <count>`。既定 4
-- 単ページ実行と同じ待機、抽出、整形、出力先オプション
-- PDF リンク保存:
-  - `--download-pdfs <dir>`: 各ページの PDF リンクだけを保存する PDF 専用 batch
-  - `--download-linked-pdfs <dir>`: 通常 scrape の batch と同時に PDF リンクも保存する sidecar
-  - `--overwrite-pdfs`: 既存 PDF を同名で置き換える
+- `--concurrency <count>`; defaults to 4
+- The same wait, extraction, formatting, and output-destination options as single-page execution
+- PDF link saving:
+  - `--download-pdfs <dir>`: PDF-only batch that saves only PDF links from each page
+  - `--download-linked-pdfs <dir>`: sidecar mode that saves PDF links alongside a normal scrape batch
+  - `--overwrite-pdfs`: replace existing PDFs with the same name
 
-## URL ソースの解決
+## Resolving URL sources
 ### `--sitemap`
-- URL が `.xml` または `.xml.gz` で終わる場合は、その URL を sitemap として扱う
-- それ以外の URL ではサイトルートの `/sitemap.xml` を解決対象にする
-- `urlset` と `sitemapindex` を解釈し、入れ子の sitemap もたどる
-- gzip 圧縮された sitemap は未対応
+- If the URL ends in `.xml` or `.xml.gz`, treat it as the sitemap
+- For other URLs, resolve the site's `/sitemap.xml`
+- Interpret `urlset` and `sitemapindex`, including nested sitemaps
+- Gzip-compressed sitemap contents are not supported
 
 ### `--url-file`
-- 1 行 1 URL のテキストファイルを読む
-- 空行と `#` で始まる行は無視する
-- 重複 URL は除去する
-- 不正な URL 行があれば、その時点で失敗にする
+- Read a text file with one URL per line
+- Ignore blank lines and lines beginning with `#`
+- Remove duplicate URLs
+- Fail immediately if an invalid URL line is found
 
-## 処理概要
-1. `--sitemap` または `--url-file` から URL 群を解決する
-2. `--concurrency` に基づいて並列数を制限する
-3. 各 URL について単ページ実行と同じ `WebScraper` を走らせる
-4. 各ページの出力に対して `--markdown` / `--pretty-print` などの整形を適用する
-5. ページ単位の成功 / 失敗を集約し、最終 JSON を返す
+## Processing overview
+1. Resolve URLs from `--sitemap` or `--url-file`
+2. Limit concurrency according to `--concurrency`
+3. Run the same `WebScraper` used for a single page for every URL
+4. Apply formatting such as `--markdown` or `--pretty-print` to each page result
+5. Aggregate per-page success and failure and return the final JSON
 
-`--download-linked-pdfs` を指定した場合は、各ページの通常 scrape と同じ `WKWebView` 実行中に PDF リンクも収集する。PDF 本体は `URLSession` で保存し、結果は `<PDF保存先>/pdf-downloads.json` に書き出す。通常 scrape の batch JSON は stdout または `--output` の指定先に維持される。
+With `--download-linked-pdfs`, PDF links are collected during the same `WKWebView` execution as the normal scrape for each page. PDF files are saved with `URLSession`, and the result is written to `<PDF output directory>/pdf-downloads.json`. The normal scrape batch JSON remains on stdout or at the path specified by `--output`.
 
-`--download-pdfs` を指定した場合は通常 scrape の抽出は行わず、各ページから PDF リンクを収集して保存する。最終出力は PDF ダウンロード結果の batch JSON になる。
+With `--download-pdfs`, normal extraction is skipped. PDF links are collected and saved for every page, and the final output is the PDF download batch JSON.
 
-## 出力形式
-- `source.kind`: `sitemap` または `url-file`
-- `source.location`: 解決に使った sitemap URL または URL ファイルパス
-- `pageCount`: 総ページ数
-- `successCount`: 成功ページ数
-- `failureCount`: 失敗ページ数
-- `pages[].url`: 対象ページ URL
-- `pages[].success`: 成功可否
-- `pages[].output`: 成功時の抽出結果
-- `pages[].error`: 失敗時のエラーメッセージ
+## Output format
+- `source.kind`: `sitemap` or `url-file`
+- `source.location`: sitemap URL or URL file path used for resolution
+- `pageCount`: total page count
+- `successCount`: number of successful pages
+- `failureCount`: number of failed pages
+- `pages[].url`: target page URL
+- `pages[].success`: whether the page succeeded
+- `pages[].output`: extraction result on success
+- `pages[].error`: error message on failure
 
-## 完了条件
-- 対象 URL 群を最後まで処理し、batch 結果 JSON を返せること
-- 全件成功なら終了コード 0、1 件でも失敗があれば終了コード 1 を返せること
+## Completion criteria
+- All target URLs are processed and a batch result JSON is returned
+- Exit code 0 is returned when every page succeeds; exit code 1 is returned when at least one page fails
 
-## 注意点
-- batch 実行時の最終出力は常に JSON で、各ページの結果が `pages[]` に入る
-- `--output <path>` を指定した場合は、batch JSON 全体を 1 ファイルへ保存する
-- `--concurrency` は `--sitemap` または `--url-file` と一緒に指定する
-- `--sitemap` は対象サイト URL が必要で、`--url-file` は URL の同時指定と併用できない
-- `--sitemap` と `--url-file` は同時指定できない
-- `--cookie-jar` は batch 実行では使用できない
+## Notes
+- The final output of batch execution is always JSON, with each page result in `pages[]`
+- With `--output <path>`, save the entire batch JSON to one file
+- Use `--concurrency` together with `--sitemap` or `--url-file`
+- `--sitemap` requires the target site URL; `--url-file` cannot be combined with a positional URL
+- `--sitemap` and `--url-file` cannot be used together
+- `--cookie-jar` cannot be used for batch execution

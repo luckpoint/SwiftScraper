@@ -1,31 +1,31 @@
-# 09. 画像抽出と heuristic
+# 09. Image Extraction and Heuristics
 
-## 目的
-本文寄りの画像は残しつつ、ロゴ、UI アイコン、広告、極小画像を HTML / Markdown 出力から除去する。
+## Purpose
+Keep content-oriented images while removing logos, UI icons, advertisements, and tiny images from HTML and Markdown output.
 
-## 採用方針
-- 画像候補の特徴量収集は JavaScript で行う
-- スコアリングと閾値判定は Swift で行う
-- HTML の最終除去は Swift 側で行う
+## Adopted approach
+- Collect image candidate features with JavaScript
+- Score candidates and apply thresholds in Swift
+- Remove images from the final HTML on the Swift side
 
-この分割により、DOM 依存の観測は柔軟に保ちつつ、判定ロジックは Swift で保守できる。
+This split keeps DOM-dependent observation flexible while keeping the decision logic maintainable in Swift.
 
-## 現在の実装範囲
-実装済み:
-- `document.images` から候補メタデータを収集
-- `header/nav + home link + logo keyword` を強く減点
-- 小さい画像を減点
-- `article/main/figure/figcaption` を加点
-- `reasons` を出せるデバッグ出力
-- `article-only` フィルタ
-- HTML / Markdown 出力前の `img` 除去
+## Current implementation scope
+Implemented:
+- Collect candidate metadata from `document.images`
+- Apply strong penalties to `header/nav + home link + logo keyword`
+- Penalize small images
+- Reward `article/main/figure/figcaption`
+- Provide debug output with `reasons`
+- Support the `article-only` filter
+- Remove `img` elements before HTML / Markdown output
 
-未実装:
-- batch 実行での同一ホスト共通画像頻度補正
-- ドメイン別 blacklist / whitelist
-- `background-image` / `canvas` 対応
+Not implemented:
+- Cross-page common-image frequency adjustment during batch execution
+- Domain-specific blacklists or whitelists
+- `background-image` and `canvas` support
 
-## JS 側で収集する特徴量
+## Features collected on the JavaScript side
 - `currentSrc`, `src`
 - `alt`, `title`
 - `naturalWidth`, `naturalHeight`
@@ -40,56 +40,56 @@
 - `isDataUri`, `isSvg`
 - `nearestTextBlockLength`
 
-返り値は `JSON.stringify(...)` した配列で、Swift 側では `ImageCandidate` として decode する。
+The return value is an array serialized with `JSON.stringify(...)), which Swift decodes as `ImageCandidate`.
 
-## Swift 側の判定
-初期スコアは `0.5`。
+## Swift-side decision
+The initial score is `0.5`.
 
-主な加点:
+Main positive signals:
 - `inArticle`
 - `inFigure`
-- `figcaption` あり
-- 十分な表示サイズ
-- 十分な元画像サイズ
-- 説明的な `alt`
-- 本文ブロック近傍
-- ヒーロー画像らしい大面積
+- `figcaption` present
+- Sufficient rendered size
+- Sufficient source image size
+- Descriptive `alt` text
+- Near a content text block
+- Large area suggesting a hero image
 
-主な減点:
-- `logo`, `icon`, `nav`, `header`, `footer`, `share`, `ad` などの文脈キーワード
-- `header` / `nav` / `footer` / `aside`
-- ホームリンク画像
+Main negative signals:
+- Context keywords such as `logo`, `icon`, `nav`, `header`, `footer`, `share`, and `ad`
+- `header`, `nav`, `footer`, and `aside`
+- Image linked to the home page
 - SVG
-- 極小画像
-- 極端な横長画像
-- 小さい `data:` URI
+- Tiny image
+- Extremely wide image
+- Small `data:` URI
 
-判定:
+Decision:
 ```text
 score >= threshold    keep
 0.40..<threshold      maybe
 < 0.40                drop
 ```
 
-既定の `threshold` は `0.65`。
+The default `threshold` is `0.65`.
 
-## article-only フィルタ
-`--image-filter article-only` を指定した場合は、`inArticle == false` の画像を最終的に `drop` 扱いにする。
+## The article-only filter
+With `--image-filter article-only`, images where `inArticle == false` are treated as `drop` in the final output.
 
-これは heuristic スコアとは別の出力フィルタであり、`reasons` に `filtered_article_only` を追加する。
+This is an output filter separate from the heuristic score, and it adds `filtered_article_only` to `reasons`.
 
-## 出力への反映
-`--extract-images` は HTML 系抽出モードだけで有効。
+## Applying the result to output
+`--extract-images` is available only for HTML extraction modes.
 
-処理順:
-1. 通常の HTML 抽出を行う
-2. 画像候補メタデータを JS で収集する
-3. Swift でスコアリングする
-4. `keep`、必要なら `maybe` だけ残す
-5. HTML から不要な `img` を除去する
-6. その後に `--markdown` / `--pretty-print` を適用する
+Processing order:
+1. Perform normal HTML extraction
+2. Collect image candidate metadata with JavaScript
+3. Score candidates in Swift
+4. Keep `keep` candidates and, when requested, `maybe` candidates
+5. Remove unwanted `img` elements from the HTML
+6. Apply `--markdown` or `--pretty-print`
 
-`figure` 内の画像を落とした結果 `figure` が空になった場合、その `figure` ごと除去する。
+If removing an image leaves a `figure` empty, remove the entire `figure` as well.
 
 ## CLI
 ```text
@@ -100,7 +100,7 @@ score >= threshold    keep
 --image-debug
 ```
 
-### 推奨例
+### Recommended example
 ```bash
 swift run swift-scraper -- \
   https://example.com/article \
@@ -111,19 +111,19 @@ swift run swift-scraper -- \
   --image-debug
 ```
 
-## デバッグ
-`--image-debug` を付けると、stderr に JSON を 1 行で出す。
+## Debugging
+With `--image-debug`, one line of JSON is written to stderr.
 
-主な内容:
+Main fields:
 - `pageURL`
 - `filter`
 - `scoreThreshold`
 - `includeMaybe`
-- 各画像の `score`, `decision`, `reasons`
+- `score`, `decision`, and `reasons` for each image
 
-この JSON を見ながらキーワード辞書や閾値を調整する。
+Use this JSON to tune the keyword dictionary and threshold.
 
-## 注意点
-- `header` 内に記事ヒーロー画像があるサイトもあるため、`header` は即除外ではなく減点に留める
-- `article-only` は強いフィルタなので、ヒーロー画像が本文外にあるサイトでは取りこぼしうる
-- 現時点では 1 ページ内の文脈だけで判定するため、サイト共通アセット除外は batch 頻度補正の追加が必要
+## Notes
+- Some sites place article hero images inside `header`, so `header` is penalized rather than immediately excluded
+- `article-only` is a strong filter and may omit hero images that sit outside the article region
+- The current decision uses only context within one page, so excluding site-wide assets requires batch frequency adjustment

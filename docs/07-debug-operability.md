@@ -1,45 +1,45 @@
-# 07. デバッグ運用
+# 07. Debug Operability
 
-## 目的
-開発時の確認容易性と、本番時の静かな実行を両立する。
+## Purpose
+Support easy inspection during development while keeping production execution quiet.
 
-## 要件
-- 開発中は WebView を表示できること
-- Cookie 状態や DOM 状態を確認できること
-- 本番では非表示寄りの運用へ切り替えられること
+## Requirements
+- Allow the WebView to be shown during development
+- Allow cookie and DOM state to be inspected
+- Allow production to switch to a mostly hidden mode
 
-## 実装済み切り替え手段
-- `--visibility visible-window` で WebView を目視確認できる
-- `--visibility hidden-window` / `windowless` で静かな運用へ切り替えられる
-- `--verbose` で進行ログを `stderr` に出せる
-- `--inspect-structure` で本文候補の選ばれ方を確認できる
-- `--image-debug` で画像 heuristic の `score` / `decision` / `reasons` を JSON で確認できる
+## Implemented switches
+- Use `--visibility visible-window` to inspect the WebView visually
+- Use `--visibility hidden-window` or `windowless` for quiet execution
+- Use `--verbose` to write progress logs to `stderr`
+- Use `--inspect-structure` to inspect how content candidates are selected
+- Use `--image-debug` to inspect image heuristic `score`, `decision`, and `reasons` as JSON
 
-## モード方針
-- 開発モード
-  - WebView を表示して挙動を確認する
-  - Cookie 注入や DOM 取得を目視しやすくする
-- 本番モード
-  - 非表示または非前面を優先する
-  - ユーザーへの露出を抑える
+## Mode policy
+- Development mode
+  - Show the WebView to inspect behavior
+  - Make cookie injection and DOM extraction easier to inspect visually
+- Production mode
+  - Prefer hidden or non-frontmost execution
+  - Minimize user exposure
 
-## 確認対象
-- Cookie 注入結果
-- ナビゲーションイベント
-- レンダリング待機条件の充足有無
-- 未到達セレクタ / テキスト
-- DOM 変化検知ログ
-- 取得 HTML の内容
-- 画像候補ごとのスコアと除外理由
-- 出力保存先
-- batch 実行時のページ単位成功 / 失敗
+## Inspection targets
+- Cookie injection results
+- Navigation events
+- Whether rendering wait conditions were satisfied
+- Selectors or text that were not reached
+- DOM change detection logs
+- Extracted HTML contents
+- Scores and exclusion reasons for each image candidate
+- Output destination
+- Per-page success or failure during batch execution
 
-## 完了条件
-- 開発時のトラブルシュートと本番時の静音運用を同じ設計内で切り替えられること
+## Completion criteria
+- Development troubleshooting and quiet production operation can be switched within the same design
 
-## 注意点
-- `--verbose` は標準出力ではなく標準エラーへ出るため、抽出結果の stdout と分離できる
-- `--image-debug` も標準エラーへ出るため、抽出本文の stdout を汚さない
-- `--inspect-structure` は本文推定の調整用途であり、抽出 HTML 自体は返さない
-- 本番寄りの隠蔽を優先しすぎると、原因調査が困難になる
-- 初期実装では開発モードを優先し、安定後に非表示運用を強める
+## Notes
+- `--verbose` writes to standard error rather than standard output, so it remains separate from extraction output on stdout
+- `--image-debug` also writes to standard error and does not pollute extracted content on stdout
+- `--inspect-structure` is for tuning content detection and does not return the extracted HTML itself
+- Over-prioritizing production concealment can make root-cause investigation difficult
+- The initial implementation prioritizes development mode; hidden operation can be strengthened after stability is established

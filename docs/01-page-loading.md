@@ -1,31 +1,30 @@
-# 01. ページロード
+# 01. Page Loading
 
-## 目的
-`WKWebView` を用いて macOS 上で対象 URL を読み込み、後続のレンダリング待機と HTML 取得へ処理を引き渡す。
+## Purpose
+Load the target URL on macOS with `WKWebView`, then hand control to rendering waits and HTML extraction.
 
-## 要件
-- 指定 URL を `WKWebView.load(_:)` で読み込めること
-- `WKWebViewConfiguration` と `WKWebsiteDataStore` を初期化できること
-- 既定では `WKWebsiteDataStore.nonPersistent()` を選べること
-- 非表示運用でも適切な frame サイズを維持できること
-- ロード成功 / 失敗を delegate で受け取れること
+## Requirements
+- Load the specified URL with `WKWebView.load(_:)`
+- Initialize `WKWebViewConfiguration` and `WKWebsiteDataStore`
+- Allow `WKWebsiteDataStore.nonPersistent()` to be selected by default
+- Maintain an appropriate frame size even when running without a visible window
+- Receive load success and failure through the delegate
 
-## 入力
-- 対象 URL
-- WebView の設定値
-- Cookie 注入済みの `WKHTTPCookieStore`
+## Inputs
+- Target URL
+- WebView configuration values
+- A `WKHTTPCookieStore` with injected cookies
 
-## 処理概要
-1. `WKWebViewConfiguration` を作成する
-2. `WKWebsiteDataStore` を設定する
-3. `WKWebView` を生成し、適切な frame を与える
-4. `URLRequest` を作成して `load(_:)` を呼ぶ
-5. `didFinish` または失敗イベントを受け取る
+## Processing overview
+1. Create `WKWebViewConfiguration`
+2. Configure `WKWebsiteDataStore`
+3. Create `WKWebView` with an appropriate frame
+4. Create a `URLRequest` and call `load(_:)`
+5. Receive `didFinish` or a failure event
 
-## 完了条件
-- ナビゲーション完了イベントを受け取り、レンダリング待機処理へ進める状態になること
+## Completion criteria
+- A navigation-completed event is received and processing can move to the rendering wait stage
 
-## 注意点
-- `didFinish` は最終描画完了ではない
-- サイズ 0 の WebView はレスポンシブ表示や lazy load に悪影響を与える
-
+## Notes
+- `didFinish` does not mean that final rendering is complete
+- A zero-size WebView can interfere with responsive layouts and lazy loading

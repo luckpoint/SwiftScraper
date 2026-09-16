@@ -1,335 +1,332 @@
-# macOS における OS 標準 WebView を用いたスクレイピング機能  
-## 初期要求・設計まとめ
+# Scraping with the Native macOS WebView
+## Initial Requirements and Design Summary
 
-## 1. 背景
+## 1. Background
 
-対象サイトについて、単純な HTTP 取得だけでは十分でないケースを想定している。  
-具体的には、ページの内容が JavaScript により動的にレンダリングされる可能性があるため、**ブラウザエンジン上で実際にページを読み込み、JS 実行後の DOM / HTML を取得する仕組み**が必要である。
+The target sites may include cases where a simple HTTP fetch is insufficient.
+In particular, page content may be rendered dynamically by JavaScript, so the system must load the page in a browser engine and capture the DOM or HTML after JavaScript execution.
 
-この要件に対して、Playwright のような外部ブラウザ自動化フレームワークは使わず、**macOS 標準の WebView（`WKWebView`）を利用して実現する**方針とする。
-
----
-
-## 2. やりたいこと
-
-今回やりたいことは以下。
-
-- macOS 上で OS 標準の WebView を用いてページをロードする
-- 必要に応じて **Cookie を事前注入**する
-- JavaScript による描画が完了したタイミングを見て
-- ページの最終的な HTML（または必要な DOM 情報 / Markdown）を取得する
-- できればユーザーに強く意識させない形で動作させたい
-- ただし、完全 headless や完全不可視であることまでは必須ではない
+The chosen approach is to use macOS's native WebView, `WKWebView`, rather than an external browser automation framework such as Playwright.
 
 ---
 
-## 3. 前提・整理
+## 2. Goals
 
-### 3.1 Playwright は使わない
-ブラウザ自動化基盤として Playwright は利用しない。  
-代わりに `WKWebView` をアプリケーション内に埋め込み、自前でロード制御・Cookie 注入・DOM 取得を実装する。
+The goals are:
 
-### 3.2 JavaScript レンダリング対応が必要
-単なる `URLSession` ベースの HTML 取得では不足する可能性がある。  
-そのため、**実ブラウザ相当のレンダリング環境として `WKWebView` を使う必要がある**。
-
-### 3.3 完全 headless は前提にしない
-`WKWebView` は GUI コンポーネントであり、Playwright/Puppeteer のような意味での完全 headless 実行には向いていない。  
-よって本設計では、**headless 相当を目指すのではなく、ユーザーへの露出を最小限にする**方針を採る。
+- Load pages on macOS with the native WebView
+- Inject cookies before loading when necessary
+- Detect when JavaScript rendering has completed
+- Capture the final page HTML, or the required DOM information or Markdown
+- Operate without drawing excessive attention from the user when possible
+- Avoid requiring a completely headless or completely invisible environment
 
 ---
 
-## 4. 実現方針の概要
+## 3. Assumptions and Decisions
 
-## 4.1 採用技術
-- 言語: Swift
-- プラットフォーム: macOS
-- Web 表示基盤: `WKWebView`
-- Cookie 管理: `WKWebsiteDataStore` / `WKHTTPCookieStore`
-- HTML 取得: `evaluateJavaScript("document.documentElement.outerHTML")`
+### 3.1 Do not use Playwright
+Playwright is not used as the browser automation foundation.
+Instead, embed `WKWebView` in the application and implement load control, cookie injection, and DOM extraction directly.
 
----
+### 3.2 JavaScript rendering support is required
+A simple `URLSession`-based HTML fetch may be insufficient.
+Therefore, `WKWebView` is required as a real-browser-like rendering environment.
 
-## 4.2 基本方針
-`WKWebView` を用いて対象ページを読み込み、ロード後に JavaScript を実行して DOM/HTML を取得する。  
-Cookie が必要な場合は、ロード前に `WKHTTPCookieStore` に注入する。
-
-また、ユーザーへの見え方については次の順で検討する。
-
-1. **ウィンドウを表示しない**
-2. 必要なら **非表示ウィンドウ上で動作**
-3. それでも必要なら **最背面で表示**
-
-つまり、**「最背面化」を第一手段にせず、まずはそもそも見せない構成を優先する**。
+### 3.3 Complete headless operation is not an assumption
+`WKWebView` is a GUI component and is not suited to completely headless execution in the same sense as Playwright or Puppeteer.
+This design therefore aims to minimize user exposure rather than to reproduce a headless browser.
 
 ---
 
-## 5. 要件
+## 4. High-Level Approach
 
-## 5.1 機能要件
-
-### 5.1.1 ページロード
-- 指定 URL を `WKWebView` でロードできること
-
-### 5.1.2 Cookie 注入
-- ロード前に任意の Cookie を挿入できること
-- 対象ドメイン・パス・Secure 属性などを適切に指定できること
-- Cookie 注入完了後にロードを開始すること
-
-### 5.1.3 JS レンダリング後の HTML 取得
-- ページロード後、JavaScript 実行後の DOM を取得できること
-- 取得対象は基本的に `document.documentElement.outerHTML` とする
-- 必要に応じて一部要素抽出にも拡張可能とする
-- 抽出後に Markdown へ変換できること
-
-### 5.1.4 レンダリング待機
-- `didFinish` のみをもって描画完了とみなさない
-- 必要に応じて、特定セレクタ出現・一定時間待機・ポーリング等でレンダリング完了を判断すること
+## 4.1 Selected technologies
+- Language: Swift
+- Platform: macOS
+- Web rendering: `WKWebView`
+- Cookie management: `WKWebsiteDataStore` / `WKHTTPCookieStore`
+- HTML extraction: `evaluateJavaScript("document.documentElement.outerHTML")`
 
 ---
 
-## 5.2 非機能要件
+## 4.2 Basic policy
+Load the target page with `WKWebView`, then execute JavaScript after loading to obtain the DOM or HTML.
+When cookies are required, inject them into `WKHTTPCookieStore` before loading.
 
-### 5.2.1 ユーザーへの露出を抑える
-- 可能な限りウィンドウは表示しない
-- フォーカスを奪わない
-- ユーザーの作業を妨げない
-- ただし「完全に存在を悟らせない」ことまでは要求しない
+Consider user visibility in this order:
 
-### 5.2.2 安定性
-- ページロード失敗時のハンドリングがあること
-- タイムアウト制御があること
-- JS レンダリング待機が永遠に終わらないケースに備えること
+1. Do not show a window
+2. If necessary, run in a hidden window
+3. If still necessary, show it at the back
 
-### 5.2.3 デバッグ容易性
-- 開発中は WebView を表示できる構成にし、本番では非表示寄りに切り替えられること
-- Cookie 注入や DOM 状態の確認が可能であること
+In other words, prioritize a configuration that does not show the WebView before considering a backmost window.
 
 ---
 
-## 6. 実現方法の概要
+## 5. Requirements
 
-## 6.1 WebView の扱い
-`WKWebView` を生成し、必要に応じて `WKWebsiteDataStore.nonPersistent()` を使ってセッションをメモリ内に閉じる。  
-スクレイピング用途では、状態の持ち越しを避けやすいため `nonPersistent()` が基本候補となる。
+## 5.1 Functional requirements
 
-WebView は原則として以下のいずれかで利用する。
+### 5.1.1 Page loading
+- Load the specified URL in `WKWebView`
 
-- **ウィンドウに載せずメモリ上で保持**
-- **非表示のウィンドウに載せて保持**
-- 必要時のみ最背面ウィンドウに載せる
+### 5.1.2 Cookie injection
+- Insert arbitrary cookies before loading
+- Set the target domain, path, `Secure` attribute, and related fields correctly
+- Start loading after cookie injection completes
+
+### 5.1.3 HTML extraction after JavaScript rendering
+- Capture the DOM after page loading and JavaScript execution
+- Use `document.documentElement.outerHTML` as the default extraction target
+- Allow extension to extract selected elements when needed
+- Allow the extracted result to be converted to Markdown
+
+### 5.1.4 Rendering wait
+- Do not treat `didFinish` alone as rendering completion
+- Determine completion with a selector check, a fixed wait, polling, or another strategy when needed
 
 ---
 
-## 6.2 Cookie 注入
-Cookie は `WKHTTPCookieStore` に対してロード前に設定する。  
-設定完了コールバックの後に対象ページのロードを開始する。
+## 5.2 Non-functional requirements
 
-注意点:
-- ドメイン・パスの整合性が必要
-- `Secure` 付き Cookie は HTTPS 前提
-- Cookie だけでなく `localStorage` や別の認証状態が必要なサイトもあり得る
+### 5.2.1 Limit user exposure
+- Avoid showing a window whenever possible
+- Do not steal focus
+- Do not interrupt the user's work
+- Do not require that the application be completely undetectable
+
+### 5.2.2 Stability
+- Handle page-load failures
+- Provide timeout control
+- Protect against JavaScript rendering waits that never finish
+
+### 5.2.3 Debuggability
+- Allow the WebView to be shown during development and switch to a more hidden mode in production
+- Make cookie injection and DOM state inspectable
 
 ---
 
-## 6.3 HTML 取得
-ページロード後に `evaluateJavaScript` で以下を実行する。
+## 6. Implementation Overview
+
+## 6.1 WebView handling
+Create `WKWebView` and, when appropriate, use `WKWebsiteDataStore.nonPersistent()` to keep the session in memory.
+For scraping, `nonPersistent()` is the default candidate because it helps avoid carrying state between runs.
+
+Use the WebView in one of the following ways:
+
+- Keep it in memory without attaching it to a window
+- Keep it in a hidden window
+- Attach it to a backmost window only when necessary
+
+---
+
+## 6.2 Cookie injection
+Set cookies in `WKHTTPCookieStore` before loading.
+Start loading the target page after the completion callback confirms that the settings are complete.
+
+Notes:
+- Domain and path values must be consistent
+- Cookies with `Secure` require HTTPS
+- Some sites may require `localStorage` or another authentication state in addition to cookies
+
+---
+
+## 6.3 HTML extraction
+After page loading, execute the following with `evaluateJavaScript`:
 
 - `document.documentElement.outerHTML`
 
-必要に応じて、以下への拡張も可能。
+This can be extended when needed to support:
 
 - `document.body.innerText`
-- 特定セレクタの `innerHTML`
-- 配列化した抽出結果の返却
-- 抽出 HTML の Markdown 変換
+- `innerHTML` for a selected element
+- Returning extracted results as an array
+- Converting extracted HTML to Markdown
 
 ---
 
-## 6.4 レンダリング待機
-`didFinish` は「ナビゲーション完了」に近く、SPA や遅延描画ではまだ DOM が揃っていない場合がある。  
-そのため、次のような待機戦略を組み合わせる。
+## 6.4 Rendering wait
+`didFinish` is close to navigation completion, but an SPA or delayed-rendering page may still be building its DOM.
+Combine wait strategies such as:
 
-- 一定時間待機
-- 特定 CSS セレクタの存在確認
-- テキスト出現確認
-- 複数回ポーリング
-- 最大待機時間を超えたらタイムアウト
-
----
-
-## 7. ユーザーに意識させにくくするための工夫
-
-## 7.1 基本方針
-本件では「完全に不可視」までは求めないが、**できる限りユーザーの意識にのぼりにくい動作**を目指す。
-
-優先順位は以下の通り。
-
-### 第1候補: ウィンドウを出さない
-- `WKWebView` 自体は生成する
-- ただし画面に表示しない
-- ユーザーの視界・操作対象に入れない
-
-これが最も自然で、ユーザー体験への影響も小さい。
-
-### 第2候補: 非表示ウィンドウを使う
-- WebView をウィンドウに載せるが、表示しない
-- フォーカスを取らない
-- 通常操作に干渉しない
-
-AppKit 的な安定性が必要な場合の妥協案として有効。
-
-### 第3候補: 最背面で動かす
-- どうしても表示が必要な場合に限り、最背面ウィンドウとする
-- ただし Mission Control やウィンドウ管理上は見える可能性がある
-- そのため、最背面化だけで「見えていないこと」を保証しない
+- A fixed delay
+- Checking for a specific CSS selector
+- Checking for specific text
+- Repeated polling
+- Timing out after the maximum wait duration
 
 ---
 
-## 7.2 フォーカスを奪わない
-最も避けるべきなのは、ユーザー作業中にアプリが前面化すること。  
-よって以下は原則避ける。
+## 7. Reducing User Awareness
 
-- アプリを強制的にアクティブ化する
-- ウィンドウを key/front にする
-- ユーザー入力を奪うような表示変更
+## 7.1 Basic policy
+The requirement is not complete invisibility, but the process should be as unobtrusive as possible.
 
-「目に入る」以上に「操作を奪う」ことが UX 上問題となる。
+Use the following priority:
 
----
+### First choice: Do not show a window
+- Create `WKWebView`
+- Do not display it on screen
+- Keep it out of the user's view and normal interaction
 
-## 7.3 開発時と本番時を分ける
-開発初期は WebView を表示し、挙動確認・Cookie 確認・DOM 確認をしやすくする。  
-本番運用時にのみ、非表示・非前面・最背面化などの工夫を入れる。
+This is the most natural option and has the smallest impact on user experience.
 
-この切り分けにより、実装難度と運用時 UX の両立を図る。
+### Second choice: Use a hidden window
+- Attach the WebView to a window but keep it hidden
+- Do not take focus
+- Do not interfere with normal interaction
 
----
+This is a useful compromise when AppKit stability requires a window.
 
-## 7.4 必要以上に「隠しすぎない」
-本件では「まったく意識させない」レベルまでは不要である。  
-そのため、実装の不自然さや OS 的な挙動の不安定さを招くような過剰な隠蔽は避ける。
-
-たとえば、
-- 極端なオフスクリーン配置
-- 不自然な透明ウィンドウ
-- システム挙動に逆らうような前後制御
-
-などは、必要がなければ採らない。
-
-**“ユーザーの邪魔をしない” を主目的にし、“完全に存在を消す” は主目的にしない**。
+### Third choice: Run at the back
+- Use a backmost window only when display is unavoidable
+- The window may still be visible in Mission Control or window-management views
+- A backmost window alone does not guarantee that the process is invisible
 
 ---
 
-## 8. 想定シーケンス
+## 7.2 Do not steal focus
+The behavior to avoid most is bringing the application to the front while the user is working.
+In principle, avoid:
 
-以下、Cookie 注入から HTML 取得までの基本シーケンス。
+- Forcibly activating the application
+- Making the window key or bringing it to the front
+- Changing the display in a way that captures user input
 
-### 8.1 初期化
-1. アプリケーション起動
-2. `WKWebViewConfiguration` を作成
-3. `WKWebsiteDataStore` を設定
-4. `WKWebView` を生成
-5. 必要に応じて非表示運用のための保持方法を決定
-   - ウィンドウなし
-   - 非表示ウィンドウ
-   - 最背面ウィンドウ
-
-### 8.2 セッション準備
-6. `WKHTTPCookieStore` を取得
-7. 必要な Cookie を組み立てる
-8. Cookie を `setCookie` で注入
-9. Cookie 設定完了を待つ
-
-### 8.3 ページロード
-10. 対象 URL の `URLRequest` を作成
-11. `WKWebView.load(...)` でページを読み込む
-12. ナビゲーション完了イベントを受け取る
-
-### 8.4 JS レンダリング待機
-13. `didFinish` 到達後、即座には HTML を取らない
-14. 必要条件を満たすまで待機する
-   - 一定待機
-   - セレクタ出現確認
-   - ポーリング
-15. 条件充足またはタイムアウトで次に進む
-
-### 8.5 HTML 取得
-16. `evaluateJavaScript("document.documentElement.outerHTML")` を実行
-17. HTML 文字列を受け取る
-18. 必要に応じて保存・解析・次工程へ渡す
-
-### 8.6 終了処理
-19. WebView を破棄または再利用キューへ戻す
-20. 必要に応じて Cookie / セッションをクリア
-21. 次ページ処理またはタスク終了
+Taking control of interaction is a greater UX problem than merely being visible.
 
 ---
 
-## 9. 設計上の注意点
+## 7.3 Separate development and production
+During early development, show the WebView to make behavior, cookies, and the DOM easy to inspect.
+Only in production should the implementation add hidden, non-frontmost, or backmost behavior.
 
-## 9.1 `didFinish` だけでは足りない
-JS 描画型サイトでは `didFinish` 後に DOM が更新され続ける。  
-よって、描画完了判定は追加ロジックが必要。
-
----
-
-## 9.2 viewport / サイズ依存
-WebView を非表示で使う場合でも、サイズ 0 にしない方がよい。  
-レスポンシブ表示、遅延読み込み、可視判定などに影響するため、適切な frame サイズを持たせる。
+This separation balances implementation difficulty with production UX.
 
 ---
 
-## 9.3 lazy load / 可視領域依存
-画像や要素がスクロール・可視判定で読み込まれる場合がある。  
-必要なら JavaScript によるスクロール操作を補助的に行う設計も考慮する。
+## 7.4 Do not over-conceal
+Complete lack of user awareness is not required.
+Avoid excessive concealment that makes the implementation unnatural or causes unstable OS behavior.
+
+For example, avoid the following unless necessary:
+
+- Extreme off-screen placement
+- Unnatural transparent windows
+- Window-order manipulation that fights the system
+
+The primary goal is to avoid interfering with the user, rather than to erase every sign that the process exists.
 
 ---
 
-## 9.4 認証状態は Cookie だけとは限らない
-サイトによっては Cookie 以外に
+## 8. Expected Sequence
 
-- localStorage
-- sessionStorage
-- CSRF token
-- XHR ベースの追加通信
+The basic sequence from cookie injection to HTML extraction is as follows.
 
-などが必要になる場合がある。  
-初期設計ではまず Cookie 対応を前提とし、必要なら後続で拡張する。
+### 8.1 Initialization
+1. Start the application
+2. Create `WKWebViewConfiguration`
+3. Configure `WKWebsiteDataStore`
+4. Create `WKWebView`
+5. Choose how to retain it for hidden operation when needed
+   - No window
+   - Hidden window
+   - Backmost window
+
+### 8.2 Prepare the session
+6. Get `WKHTTPCookieStore`
+7. Build the required cookies
+8. Inject cookies with `setCookie`
+9. Wait for cookie configuration to complete
+
+### 8.3 Load the page
+10. Create a `URLRequest` for the target URL
+11. Load the page with `WKWebView.load(...)`
+12. Receive the navigation-completed event
+
+### 8.4 Wait for JavaScript rendering
+13. Do not capture HTML immediately after `didFinish`
+14. Wait until the required conditions are met
+   - Fixed delay
+   - Selector check
+   - Polling
+15. Continue when the conditions are met or the timeout is reached
+
+### 8.5 Extract HTML
+16. Execute `evaluateJavaScript("document.documentElement.outerHTML")`
+17. Receive the HTML string
+18. Save, analyze, or pass it to the next stage as needed
+
+### 8.6 Finish
+19. Destroy the WebView or return it to a reuse queue
+20. Clear cookies or the session when necessary
+21. Process the next page or finish the task
 
 ---
 
-## 9.5 完全 headless 相当は狙わない
-本設計は `WKWebView` の制約を前提とする。  
-そのため、CI 向け headless ブラウザのような再現性・独立性までは目標にしない。  
-あくまで **macOS 上で WebKit を利用し、JS 実行後の HTML を取得するローカル実行基盤**として位置付ける。
+## 9. Design Notes
+
+## 9.1 `didFinish` is not enough
+On JavaScript-rendered sites, the DOM can continue changing after `didFinish`.
+Additional logic is required to determine rendering completion.
 
 ---
 
-## 10. 初期設計としての結論
-
-本件では、以下の方針を採る。
-
-- Playwright は使わず、macOS 標準の `WKWebView` を利用する
-- JavaScript レンダリング後の HTML を取得する
-- ロード前に Cookie 注入を行う
-- 描画完了は `didFinish` だけで判断せず、追加待機条件を設ける
-- ユーザーへの露出は最小化するが、完全不可視までは目指さない
-- UI 面の方針は  
-  **「ウィンドウ非表示」 → 「非表示ウィンドウ」 → 「最背面表示」**  
-  の優先順とする
-- 主目的は「ユーザーに強く意識させないこと」であり、「絶対に気づかれないこと」ではない
+## 9.2 Viewport and size dependencies
+Even when using a hidden WebView, avoid setting its size to zero.
+Responsive layouts, lazy loading, and visibility checks can depend on the frame size, so provide an appropriate frame.
 
 ---
 
-## 11. 今後の詳細化ポイント
+## 9.3 Lazy loading and viewport visibility
+Images and elements may load only after scrolling or when they become visible.
+When necessary, consider supporting the process with JavaScript scrolling.
 
-次フェーズでは以下を詰める。
+---
 
-- Cookie の具体的な注入仕様
-- HTML 取得対象ページの一覧と完了判定条件
-- SPA 用の待機戦略
-- タイムアウト・リトライ方針
-- 非表示運用の具体方式
-- デバッグモード / 本番モードの切り替え仕様
-- 取得 HTML の保存先・後続処理仕様
+## 9.4 Authentication state is not limited to cookies
+Depending on the site, authentication may also require:
+
+- `localStorage`
+- `sessionStorage`
+- A CSRF token
+- Additional XHR requests
+
+The initial design assumes cookie support first and leaves other mechanisms for later extension if needed.
+
+---
+
+## 9.5 Do not target fully headless equivalence
+This design accepts the constraints of `WKWebView`.
+It does not aim for the reproducibility or independence of a CI-oriented headless browser.
+It is a local macOS execution foundation that uses WebKit to capture HTML after JavaScript execution.
+
+---
+
+## 10. Initial Design Conclusion
+
+The project adopts the following policy:
+
+- Use macOS's native `WKWebView` instead of Playwright
+- Capture HTML after JavaScript rendering
+- Inject cookies before loading
+- Add rendering wait conditions instead of relying only on `didFinish`
+- Minimize user exposure without targeting complete invisibility
+- Use this UI priority:
+  **No window** → **Hidden window** → **Backmost window**
+- Focus on being unobtrusive rather than guaranteeing that the process can never be noticed
+
+---
+
+## 11. Details for the Next Phase
+
+The next phase should define:
+
+- The concrete cookie injection specification
+- The list of pages to extract and their completion conditions
+- A wait strategy for SPAs
+- Timeout and retry policies
+- The concrete hidden-operation mechanism
+- The switch between development and production modes
+- The storage location and downstream processing for extracted HTML

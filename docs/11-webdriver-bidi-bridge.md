@@ -1,9 +1,9 @@
-# 11. WebDriver BiDi bridge
+# 11. WebDriver BiDi Bridge
 
-## 目的
-外部プログラムから WebSocket / JSON で SwiftScraper の `WKWebView` を操作し、URL 遷移、JavaScript 実行、HTML / text 取得を行えるようにする。
+## Purpose
+Allow an external program to control SwiftScraper's `WKWebView` over WebSocket and JSON, including URL navigation, JavaScript execution, and HTML or text extraction.
 
-この機能は WebDriver BiDi 風の scraping 用 bridge であり、WKWebView 自体を完全な WebDriver BiDi ブラウザにするものではない。
+This is a scraping bridge modeled after WebDriver BiDi. It does not turn WKWebView into a fully compliant WebDriver BiDi browser.
 
 ```text
 external client
@@ -14,120 +14,120 @@ SwiftNIO BiDi server
   -> WKWebView
 ```
 
-## 起動方法
-既定 endpoint は `ws://127.0.0.1:9222/session`。
+## Starting the server
+The default endpoint is `ws://127.0.0.1:9222/session`.
 
 ```bash
-swift run swift-scraper -- \
-  --bidi-server \
+swift run swift-scraper -- \\
+  --bidi-server \\
   --verbose
 ```
 
-bind host / port を変える場合:
+To change the bind host or port:
 
 ```bash
-swift run swift-scraper -- \
-  --bidi-server \
-  --bidi-host 127.0.0.1 \
+swift run swift-scraper -- \\
+  --bidi-server \\
+  --bidi-host 127.0.0.1 \\
   --bidi-port 9333
 ```
 
-初期 URL をロードしてから待ち受ける場合:
+To load an initial URL before accepting connections:
 
 ```bash
-swift run swift-scraper -- \
-  --bidi-server \
-  --url https://example.com \
+swift run swift-scraper -- \\
+  --bidi-server \\
+  --url https://example.com \\
   --visibility hidden-window
 ```
 
-## Puppeteer からの smoke test
-Puppeteer の WebDriver BiDi 接続で bridge に接続できるかを確認する最小 probe:
+## Smoke test with Puppeteer
+The minimal probe for checking a Puppeteer WebDriver BiDi connection is:
 
 ```bash
 npm install
-swift run swift-scraper -- \
-  --bidi-server \
-  --verbose \
+swift run swift-scraper -- \\
+  --bidi-server \\
+  --verbose \\
   --visibility hidden-window
 ```
 
-別 shell で:
+In another shell:
 
 ```bash
 npm run puppeteer:bidi-p1
 ```
 
-`puppeteer:bidi-p1` は script 内で `127.0.0.1` の一時 HTTP server と fixture HTML を起動し、`session.subscribe`、`browsingContext.navigate` の `wait`、`script.addPreloadScript` / `removePreloadScript`、`browsingContext.captureScreenshot`、`browsingContext.setViewport`、runtime cookie API、JavaScript error response、SwiftScraper extension scraping command を外部サイト依存なしで確認する。
+`puppeteer:bidi-p1` starts a temporary HTTP server and fixture HTML on `127.0.0.1`, then checks `session.subscribe`, the `wait` option of `browsingContext.navigate`, `script.addPreloadScript` / `removePreloadScript`, `browsingContext.captureScreenshot`, `browsingContext.setViewport`, the runtime cookie API, JavaScript error responses, and SwiftScraper extension scraping commands without relying on an external site.
 
-実サイト scraping の probe:
+Probe scraping against a live site:
 
 ```bash
 npm run puppeteer:google
 ```
 
-probe は `ws://127.0.0.1:9222/session` に `puppeteer-core` で接続し、Google を開いて検索 input に `Apple Swift` を入れ、検索を送信して検索結果リンクを抽出する。
+The probe connects to `ws://127.0.0.1:9222/session` with `puppeteer-core`, opens Google, enters `Apple Swift` in the search input, submits the search, and extracts result links.
 
-Google の bot 検知を避けて別サイトで確認する場合は、Yahoo! JAPAN 用 probe も利用できる。
+A Yahoo! JAPAN probe is also available when Google bot detection should be avoided:
 
 ```bash
 npm run puppeteer:yahoo
 ```
 
-Yahoo! JAPAN probe は `https://www.yahoo.co.jp/` を開いて検索 input に `Apple Swift` を入れ、検索を送信して `search.yahoo.co.jp` の検索結果リンクを抽出する。
+The Yahoo! JAPAN probe opens `https://www.yahoo.co.jp/`, enters `Apple Swift` in the search input, submits the search, and extracts result links from `search.yahoo.co.jp`.
 
-接続先や query を変える場合:
+To change the endpoint or query:
 
 ```bash
-SWIFTSCRAPER_BIDI_ENDPOINT=ws://127.0.0.1:9333/session \
-GOOGLE_QUERY="Apple Swift" \
+SWIFTSCRAPER_BIDI_ENDPOINT=ws://127.0.0.1:9333/session \\
+GOOGLE_QUERY="Apple Swift" \\
 npm run puppeteer:google
 ```
 
 ```bash
-SWIFTSCRAPER_BIDI_ENDPOINT=ws://127.0.0.1:9333/session \
-YAHOO_QUERY="Apple Swift" \
+SWIFTSCRAPER_BIDI_ENDPOINT=ws://127.0.0.1:9333/session \\
+YAHOO_QUERY="Apple Swift" \\
 npm run puppeteer:yahoo
 ```
 
-Google 側が bot 検知ページ（`/sorry`）を返した場合は、bridge / Puppeteer 接続自体は成功していても検索結果一覧は取得できない。その場合、probe は bot 検知 URL とページ本文の一部を出して失敗する。
+If Google returns a bot-detection page such as `/sorry`, the bridge and Puppeteer connection may still be working even though no result list can be obtained. In that case, the probe prints the bot-detection URL and part of the page text before failing.
 
-Safari と同じ User-Agent に寄せる場合は、`User-Agent` header を指定する。BiDi server mode ではこの値を navigation request header だけでなく `WKWebView.customUserAgent` にも反映する。
+To approximate Safari's User-Agent, specify a `User-Agent` header. In BiDi server mode, this value is applied both to navigation request headers and to `WKWebView.customUserAgent`.
 
 ```bash
 SAFARI_UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.3 Safari/605.1.15'
 
-swift run swift-scraper -- \
-  --bidi-server \
-  --verbose \
-  --visibility visible-window \
+swift run swift-scraper -- \\
+  --bidi-server \\
+  --verbose \\
+  --visibility visible-window \\
   --header "User-Agent: $SAFARI_UA"
 ```
 
-## 併用できる主なオプション
-- `--url <url>`: 起動時に最初に開く URL
-- `--cookie <spec>` / `--cookie-file <path>`: 起動時に明示 Cookie を注入
-- `--browser-cookies chrome|firefox` / `--browser-profile <name|path>`: macOS Chrome/Firefox の既存プロファイル Cookie を起動時の設定へ取り込む。Cookie DB は一度だけ読み込む
-- `--browser-cookies` と `--cookie-jar` は併用不可。明示 Cookie はブラウザ Cookie より優先される
-- `--header <Name: Value>`: navigation request に HTTP header を追加。`User-Agent` は `WKWebView.customUserAgent` にも反映
-- `--persistent-store`: 永続 `WKWebsiteDataStore` を使う
-- `--visibility <mode>`: `windowless` / `hidden-window` / `visible-window`。`visible-window` は起動時に `SwiftScraper BiDi` window を通常ウィンドウとして前面化する。close ボタンでは server を止めず、window だけ非表示にする
-- `--viewport <width>x<height>`: WebView サイズ
+## Main compatible options
+- `--url <url>`: URL to open first at startup
+- `--cookie <spec>` / `--cookie-file <path>`: inject explicit cookies at startup
+- `--browser-cookies chrome|firefox` / `--browser-profile <name|path>`: import cookies from an existing macOS Chrome or Firefox profile at startup; the cookie database is read only once
+- `--browser-cookies` and `--cookie-jar` cannot be used together; explicit cookies take precedence over browser cookies
+- `--header <Name: Value>`: add an HTTP header to navigation requests; `User-Agent` is also applied to `WKWebView.customUserAgent`
+- `--persistent-store`: use a persistent `WKWebsiteDataStore`
+- `--visibility <mode>`: `windowless` / `hidden-window` / `visible-window`. `visible-window` brings a `SwiftScraper BiDi` window to the front as a normal window at startup. Closing it hides only the window and does not stop the server
+- `--viewport <width>x<height>`: WebView size
 - `--load-timeout <seconds>`: navigation timeout
-- `--js-timeout <seconds>`: JavaScript 実行 timeout
+- `--js-timeout <seconds>`: JavaScript execution timeout
 
-`visible-window` の表示を確認する場合は、初期 URL も指定すると `about:blank` ではなくページ内容が見える。
+When checking `visible-window`, specify an initial URL so that the window shows page content instead of `about:blank`.
 
 ```bash
-swift run swift-scraper -- \
-  --bidi-server \
-  --verbose \
-  --visibility visible-window \
+swift run swift-scraper -- \\
+  --bidi-server \\
+  --verbose \\
+  --visibility visible-window \\
   --url https://www.yahoo.co.jp/
 ```
 
-## 併用できないオプション
-BiDi server は長時間起動する操作モードなので、通常の 1 shot scraping / batch / PDF 出力 / PDF リンクダウンロードとは分離している。
+## Incompatible options
+The BiDi server is a long-running interaction mode and is separate from one-shot scraping, batch processing, PDF output, and PDF link downloading.
 
 - `--pdf`
 - `--download-pdfs`
@@ -145,217 +145,217 @@ BiDi server は長時間起動する操作モードなので、通常の 1 shot 
 - `--extract-images`
 - `--pretty-print`
 
-## 対応 method
+## Supported methods
 
-### WebDriver BiDi compatible methods
+### WebDriver BiDi-compatible methods
 
-| method | 内容 |
+| method | Description |
 | --- | --- |
-| `session.status` | server の ready 状態を返す |
-| `session.new` | Puppeteer 互換用の最小 session を作成した体裁の response を返す |
-| `session.end` | compatibility no-op。client 互換用に success を返す |
-| `session.subscribe` | client ごとの event subscription を登録する |
-| `session.unsubscribe` | client ごとの event subscription を解除する |
-| `browser.getUserContexts` | 単一 user context `default` を返す |
-| `browser.close` | compatibility no-op。server process は終了しない |
-| `browsingContext.getTree` | 単一 context `main` を返す |
-| `browsingContext.navigate` | 指定 URL へ遷移する。`wait` は `none` / `interactive` / `complete` に対応 |
-| `browsingContext.reload` | 現在 URL を再ロードする。`wait` は `none` / `interactive` / `complete` に対応 |
-| `browsingContext.captureScreenshot` | 現在 viewport の PNG screenshot を base64 で返す |
-| `browsingContext.setViewport` | runtime 中に `WKWebView` frame size を変更する |
-| `script.evaluate` | `WKWebView.evaluateJavaScript` / `callAsyncJavaScript` で式を実行する |
-| `script.callFunction` | 関数宣言と引数を page world で実行する |
-| `script.addPreloadScript` | future document に document start script を追加する |
-| `script.removePreloadScript` | 追加済み preload script を削除する |
-| `storage.getCookies` | `WKHTTPCookieStore` から runtime cookie を取得する |
-| `storage.setCookie` | runtime cookie を追加・更新する |
-| `storage.deleteCookies` | name / domain / path filter に一致する runtime cookie を削除する |
-| `emulation.setScreenOrientationOverride` | Puppeteer `page.setViewport` 互換用の compatibility no-op |
+| `session.status` | Return the server ready state |
+| `session.new` | Return a minimal session-creation response for Puppeteer compatibility |
+| `session.end` | Compatibility no-op that returns success for client compatibility |
+| `session.subscribe` | Register event subscriptions for a client |
+| `session.unsubscribe` | Remove event subscriptions for a client |
+| `browser.getUserContexts` | Return the single `default` user context |
+| `browser.close` | Compatibility no-op; the server process remains running |
+| `browsingContext.getTree` | Return the single `main` context |
+| `browsingContext.navigate` | Navigate to a URL; `wait` supports `none`, `interactive`, and `complete` |
+| `browsingContext.reload` | Reload the current URL; `wait` supports `none`, `interactive`, and `complete` |
+| `browsingContext.captureScreenshot` | Return a base64-encoded PNG screenshot of the current viewport |
+| `browsingContext.setViewport` | Change the `WKWebView` frame size at runtime |
+| `script.evaluate` | Evaluate an expression with `WKWebView.evaluateJavaScript` / `callAsyncJavaScript` |
+| `script.callFunction` | Execute a function declaration and arguments in the page world |
+| `script.addPreloadScript` | Add a document-start script for future documents |
+| `script.removePreloadScript` | Remove an added preload script |
+| `storage.getCookies` | Get runtime cookies from `WKHTTPCookieStore` |
+| `storage.setCookie` | Add or update a runtime cookie |
+| `storage.deleteCookies` | Delete runtime cookies matching name, domain, and path filters |
+| `emulation.setScreenOrientationOverride` | Compatibility no-op for Puppeteer's `page.setViewport` |
 
 ### SwiftScraper extension methods
 
-正式名は WebDriver BiDi extension module 形式の `swiftScraper:scrape.*`。既存の `scrape.*` は短縮 alias として残している。
+The official names use the WebDriver BiDi extension module form `swiftScraper:scrape.*`. Existing `scrape.*` names remain as short aliases.
 
-| method | 内容 |
+| method | Description |
 | --- | --- |
-| `swiftScraper:scrape.getHTML` | `document.documentElement.outerHTML` を返す |
-| `swiftScraper:scrape.getText` | `document.body.innerText` を返す |
-| `swiftScraper:scrape.waitForSelector` | selector が出現するまで polling する |
-| `swiftScraper:scrape.waitForText` | document text に指定文字列が出現するまで polling する |
-| `swiftScraper:scrape.waitForFunction` | JavaScript expression が truthy になるまで polling する |
-| `swiftScraper:scrape.waitForDOMStable` | DOM snapshot が一定時間変化しなくなるまで待つ |
-| `swiftScraper:scrape.autoScroll` | viewport 単位で scroll し、bottom と scrollHeight 安定を待つ |
-| `swiftScraper:scrape.extract` | SwiftScraper の抽出 engine を server mode から実行する |
-| `swiftScraper:scrape.getCookies` | `storage.getCookies` と同じ runtime cookie 取得 alias |
-| `swiftScraper:scrape.setCookie` | `storage.setCookie` と同じ runtime cookie 設定 alias |
-| `swiftScraper:scrape.deleteCookies` | `storage.deleteCookies` と同じ runtime cookie 削除 alias |
+| `swiftScraper:scrape.getHTML` | Return `document.documentElement.outerHTML` |
+| `swiftScraper:scrape.getText` | Return `document.body.innerText` |
+| `swiftScraper:scrape.waitForSelector` | Poll until a selector appears |
+| `swiftScraper:scrape.waitForText` | Poll until the requested text appears in the document text |
+| `swiftScraper:scrape.waitForFunction` | Poll until a JavaScript expression is truthy |
+| `swiftScraper:scrape.waitForDOMStable` | Wait until the DOM snapshot remains unchanged for a period |
+| `swiftScraper:scrape.autoScroll` | Scroll by viewport units and wait for the bottom and scroll height to stabilize |
+| `swiftScraper:scrape.extract` | Run the SwiftScraper extraction engine from server mode |
+| `swiftScraper:scrape.getCookies` | Runtime cookie retrieval alias for `storage.getCookies` |
+| `swiftScraper:scrape.setCookie` | Runtime cookie configuration alias for `storage.setCookie` |
+| `swiftScraper:scrape.deleteCookies` | Runtime cookie deletion alias for `storage.deleteCookies` |
 
-## 対応している仕様範囲
+## Supported scope
 
-この bridge は WebDriver BiDi の scraping 用 subset と Puppeteer 接続に必要な最小互換を実装している。標準 BiDi browser としての完全互換は目的にしていない。
+This bridge implements a scraping-oriented subset of WebDriver BiDi and the minimum compatibility needed for a Puppeteer connection. Full compatibility as a standard BiDi browser is not a goal.
 
-### Transport / session
-- WebSocket endpoint は `/session` のみ。既定は `ws://127.0.0.1:9222/session`
-- WebSocket text frame の JSON request / response に対応
-- request は `id` 付き command を前提にする。`id` がない event-style command は受け付けない
-- response は `type: "success"` / `type: "error"` を返す
-- `session.status` で ready 状態を返す
-- `session.new` は Puppeteer の pure WebDriver BiDi 接続初期化を通すための最小 capability を返す
-- `session.subscribe` / `session.unsubscribe` は WebSocket client ごとに event subscription state を保持する
-- `session.subscribe` は event 名だけでなく `log` / `browsingContext` のような module 名も簡易的に扱う
-- `session.end` は compatibility no-op
+### Transport and session
+- The only WebSocket endpoint is `/session`; the default is `ws://127.0.0.1:9222/session`
+- Support WebSocket text-frame JSON requests and responses
+- Requests require an `id` command; event-style commands without an `id` are rejected
+- Responses use `type: "success"` or `type: "error"`
+- `session.status` returns the ready state
+- `session.new` returns the minimum capabilities needed to initialize Puppeteer's pure WebDriver BiDi connection
+- `session.subscribe` and `session.unsubscribe` keep event subscription state per WebSocket client
+- `session.subscribe` accepts simple module names such as `log` and `browsingContext` as well as event names
+- `session.end` is a compatibility no-op
 
-### Browser / user context
-- user context は `default` だけ
-- `browser.getUserContexts` は `default` のみ返す
-- `browser.close` は compatibility no-op。server process は終了しない
+### Browser and user context
+- The only user context is `default`
+- `browser.getUserContexts` returns only `default`
+- `browser.close` is a compatibility no-op; the server process does not exit
 
-### Browsing context / navigation
-- browsing context は `main` だけ
-- `browsingContext.getTree` は `main` の単一 tree を返す
-- `browsingContext.navigate` は `WKWebView.load` / `loadFileURL` で URL 遷移する
-- `browsingContext.reload` は現在 URL を再ロードする
-- `wait` は `none` / `interactive` / `complete` に対応する。未指定時は既存挙動維持のため `complete`
-- `interactive` は document start の user script で `DOMContentLoaded` を hook した近似実装
-- `complete` は `WKNavigationDelegate.webView(_:didFinish:)` を待つ
-- navigation に対して簡易 `navigation` id を返す
-- navigation 中は `browsingContext.navigationStarted` を subscribed client に送る
-- navigation の DOMContentLoaded 相当時は `browsingContext.domContentLoaded` を subscribed client に送る
-- navigation 完了時は `browsingContext.load` を subscribed client に送る
-- navigation 失敗時は `browsingContext.navigationFailed` を subscribed client に送る
-- `browsingContext.captureScreenshot` は現在 viewport の PNG を `WKWebView.takeSnapshot` で取得する。full page screenshot は未対応
-- `browsingContext.setViewport` は `WKWebView` frame と visible window の content size を更新する
+### Browsing context and navigation
+- The only browsing context is `main`
+- `browsingContext.getTree` returns a single tree for `main`
+- `browsingContext.navigate` navigates with `WKWebView.load` or `loadFileURL`
+- `browsingContext.reload` reloads the current URL
+- `wait` supports `none`, `interactive`, and `complete`; the default is `complete` to preserve existing behavior
+- `interactive` is an approximation implemented by hooking `DOMContentLoaded` with a document-start user script
+- `complete` waits for `WKNavigationDelegate.webView(_:didFinish:)`
+- Navigation returns a simple `navigation` ID
+- Send `browsingContext.navigationStarted` to subscribed clients during navigation
+- Send `browsingContext.domContentLoaded` to subscribed clients at the approximate DOMContentLoaded point
+- Send `browsingContext.load` to subscribed clients when navigation completes
+- Send `browsingContext.navigationFailed` to subscribed clients when navigation fails
+- `browsingContext.captureScreenshot` captures the current viewport with `WKWebView.takeSnapshot`; full-page screenshots are unsupported
+- `browsingContext.setViewport` updates the `WKWebView` frame and the visible window content size
 
 ### Script
-- `script.evaluate` は page world で式を評価する
-- `awaitPromise: true` は `WKWebView.callAsyncJavaScript` を使う
-- `script.callFunction` は `functionDeclaration` と `arguments` を page world で実行する
-- `script.addPreloadScript` は `functionDeclaration` を future document の document start で実行する
-- `script.removePreloadScript` は script id に一致する preload script を削除する
-- preload script は既存 document には retroactive に実行しない
-- `target.context` は `main` のみ対応
-- remote value は `null` / `boolean` / `number` / `string` / `array` / `object` に正規化する
-- object remote value は BiDi deserializer 互換の property tuple 配列で返す
+- `script.evaluate` evaluates an expression in the page world
+- `awaitPromise: true` uses `WKWebView.callAsyncJavaScript`
+- `script.callFunction` executes `functionDeclaration` and `arguments` in the page world
+- `script.addPreloadScript` executes `functionDeclaration` at document start in future documents
+- `script.removePreloadScript` removes a preload script matching the script ID
+- Preload scripts are not run retroactively in the current document
+- Only the `main` value is supported for `target.context`
+- Remote values are normalized to `null`, `boolean`, `number`, `string`, `array`, or `object`
+- Object remote values are returned as property-tuple arrays compatible with the BiDi deserializer
 
-### Log event
-- document start の user script で `console.log` / `info` / `warn` / `error` / `debug` を hook する
-- console 出力を `log.entryAdded` として subscribed client に送る
+### Log events
+- A document-start user script hooks `console.log`, `info`, `warn`, `error`, and `debug`
+- Console output is sent to subscribed clients as `log.entryAdded`
 
-### 独自 scraping command
-- `swiftScraper:scrape.*` は SwiftScraper 固有の BiDi extension module。`scrape.*` は後方互換の alias
-- `swiftScraper:scrape.getHTML` は `document.documentElement.outerHTML` を返す
-- `swiftScraper:scrape.getText` は `document.body.innerText` を返す
-- `swiftScraper:scrape.waitForSelector` / `waitForText` / `waitForFunction` は `timeout` / `polling` を milliseconds で受け取る
-- `swiftScraper:scrape.waitForDOMStable` は `stableTime` / `timeout` / `polling` を milliseconds で受け取る
-- `swiftScraper:scrape.autoScroll` は既存 CLI の `--auto-scroll` と同じ scroll probe を使う
-- `swiftScraper:scrape.extract` は `mode` に `outerHTML` / `bodyText` / `selectorInnerHTML` / `contentOnly` / `structureInspection`、`format` に `plain` / `markdown` を指定できる
-- `swiftScraper:scrape.extract` は `prettyPrint`、`extractImages`、`imageFilter`、`imageScoreThreshold`、`imageIncludeMaybe`、`imageDebug` を受け取る
-- `swiftScraper:scrape.getCookies` / `setCookie` / `deleteCookies` は `storage.*` cookie command の alias
+### Custom scraping commands
+- `swiftScraper:scrape.*` is SwiftScraper's BiDi extension module; `scrape.*` is a backward-compatible alias
+- `swiftScraper:scrape.getHTML` returns `document.documentElement.outerHTML`
+- `swiftScraper:scrape.getText` returns `document.body.innerText`
+- `swiftScraper:scrape.waitForSelector`, `waitForText`, and `waitForFunction` accept `timeout` and `polling` in milliseconds
+- `swiftScraper:scrape.waitForDOMStable` accepts `stableTime`, `timeout`, and `polling` in milliseconds
+- `swiftScraper:scrape.autoScroll` uses the same scroll probe as the existing CLI's `--auto-scroll`
+- `swiftScraper:scrape.extract` accepts `outerHTML`, `bodyText`, `selectorInnerHTML`, `contentOnly`, or `structureInspection` for `mode`, and `plain` or `markdown` for `format`
+- `swiftScraper:scrape.extract` accepts `prettyPrint`, `extractImages`, `imageFilter`, `imageScoreThreshold`, `imageIncludeMaybe`, and `imageDebug`
+- `swiftScraper:scrape.getCookies`, `setCookie`, and `deleteCookies` are aliases for the `storage.*` cookie commands
 
-### 起動時設定
-- `--url` で初期 URL を load できる
-- `--cookie` / `--cookie-file` で起動時 Cookie を注入できる
-- `--header` で navigation request header を付与できる
-- `User-Agent` header は `WKWebView.customUserAgent` にも反映する
-- `--persistent-store` で永続 `WKWebsiteDataStore` を使える
-- `--viewport` で WebView frame size を指定できる
-- `--visibility visible-window` で `WKWebView` を通常 window として表示できる
+### Startup settings
+- Load an initial URL with `--url`
+- Inject startup cookies with `--cookie` or `--cookie-file`
+- Add navigation request headers with `--header`
+- Apply a `User-Agent` header to `WKWebView.customUserAgent` as well
+- Use a persistent `WKWebsiteDataStore` with `--persistent-store`
+- Set the WebView frame size with `--viewport`
+- Show `WKWebView` as a normal window with `--visibility visible-window`
 
-### Storage / Cookie
-- `storage.getCookies` は `WKHTTPCookieStore.getAllCookies` の結果を返す
-- `storage.setCookie` は `cookie` object または flat params から `HTTPCookie` を生成して設定する
-- `storage.deleteCookies` は `filter` object または flat params の `name` / `domain` / `path` に完全一致する cookie を削除する
-- partitioned cookie / storage key は未対応
+### Storage and cookies
+- `storage.getCookies` returns the result of `WKHTTPCookieStore.getAllCookies`
+- `storage.setCookie` creates and sets an `HTTPCookie` from a `cookie` object or flat parameters
+- `storage.deleteCookies` removes cookies that exactly match `name`, `domain`, and `path` in a `filter` object or flat parameters
+- Partitioned cookies and storage keys are unsupported
 
-### Puppeteer 互換の現状
-- `puppeteer.connect({ browserWSEndpoint, protocol: "webDriverBiDi" })` の接続初期化に必要な最小 command に対応している
-- `page.evaluate` / `page.evaluateHandle` 相当の DOM 操作を中心にした smoke test は動作する
-- `scripts/puppeteer-yahoo-search.mjs` は Yahoo! JAPAN で検索結果抽出まで確認済み
-- Puppeteer の高レベル API 全般を保証するものではない。`page.click` / `page.keyboard` / selector polling などは未対応 BiDi command に到達する可能性があるため、現状の probe は `page.evaluate` 中心で実装している
+### Current Puppeteer compatibility
+- Support the minimum commands needed to initialize `puppeteer.connect({ browserWSEndpoint, protocol: "webDriverBiDi" })`
+- A smoke test centered on DOM operations equivalent to `page.evaluate` and `page.evaluateHandle` works
+- `scripts/puppeteer-yahoo-search.mjs` has been verified through result extraction on Yahoo! JAPAN
+- This does not guarantee Puppeteer's full high-level API. `page.click`, `page.keyboard`, selector polling, and similar features may reach unsupported BiDi commands, so the current probe is centered on `page.evaluate`
 
-## 未対応仕様
+## Unsupported specifications
 
-### Session / browser
-- 複数 session の管理
-- event subscription の厳密な spec conformance
+### Session and browser
+- Managing multiple sessions
+- Strict specification conformance for event subscriptions
 - `browser.createUserContext`
 - `browser.removeUserContext`
-- `browser.close` による process 終了
+- Exiting the process through `browser.close`
 
 ### Browsing context
-- 複数 top-level browsing context
+- Multiple top-level browsing contexts
 - `browsingContext.create`
 - `browsingContext.close`
 - `browsingContext.activate`
 - `browsingContext.print`
 - `browsingContext.traverseHistory`
-- full page screenshot
-- iframe / child context の厳密な tree 管理
-- `browsingContext.contextCreated` / `contextDestroyed` の完全な lifecycle event
-- fragment navigation / history update / navigation committed の厳密な event
-- prompt / dialog handling
-- download 制御
+- Full-page screenshots
+- Strict tree management for iframes and child contexts
+- Complete lifecycle events for `browsingContext.contextCreated` and `contextDestroyed`
+- Strict events for fragment navigation, history updates, and navigation committed
+- Prompt and dialog handling
+- Download control
 
-### Script / realm
-- 複数 realm
-- sandbox realm
-- iframe realm
-- worker / shared worker / service worker realm
-- preload script の sandbox / realm / strict context scope
+### Script and realm
+- Multiple realms
+- Sandbox realms
+- Iframe realms
+- Worker, shared-worker, and service-worker realms
+- Strict sandbox, realm, and context scope for preload scripts
 - `script.disown`
-- remote object handle の lifetime 管理
-- DOM node remote value / shared reference
-- exception details の完全な BiDi 形式
+- Lifetime management for remote object handles
+- DOM-node remote values and shared references
+- Complete BiDi-formatted exception details
 
 ### Input
 - `input.performActions`
 - `input.releaseActions`
-- pointer / keyboard / wheel action
-- file dialog event
-- file upload 制御
+- Pointer, keyboard, and wheel actions
+- File dialog events
+- File upload control
 
 ### Network
 - `network.beforeRequestSent`
 - `network.responseStarted`
 - `network.responseCompleted`
 - `network.fetchError`
-- request interception
-- response body 取得
-- data collector
-- cache behavior 制御
-- auth challenge handling
-- WebSocket / EventSource event
+- Request interception
+- Response body retrieval
+- Data collectors
+- Cache behavior control
+- Authentication challenge handling
+- WebSocket and EventSource events
 
-### Storage / Cookie
-- partitioned cookie / storage key
-- cookie sameSite / priority / sourcePort などの詳細属性
-- `--cookie-jar` による server mode の保存
+### Storage and cookies
+- Partitioned cookies and storage keys
+- Detailed cookie attributes such as sameSite, priority, and sourcePort
+- Saving with `--cookie-jar` in server mode
 
-### Permissions / emulation
+### Permissions and emulation
 - `permissions.setPermission`
-- geolocation override
-- timezone override
-- screen orientation override
-- touch override
-- user agent override command
-- device metrics / media emulation
+- Geolocation override
+- Time-zone override
+- Screen-orientation override
+- Touch override
+- User-agent override command
+- Device metrics and media emulation
 
-### CDP / browser-specific extension
+### CDP and browser-specific extensions
 - CDP over BiDi
 - `goog:cdp.*`
 - `goog:cdp.resolveRealm`
-- Chrome / Firefox 固有 capability
+- Chrome- or Firefox-specific capabilities
 
-### 仕様上の注意
-- この bridge は `WKWebView` を外部から操作するための scraping bridge であり、WebDriver BiDi conformance target ではない
-- 未対応 command は `unknown command` を返す
-- context が `main` 以外の場合は `no such frame` を返す
-- JavaScript 実行エラーは `javascript error` として返す。JS 側 wrapper で取得できる範囲では `message` と `stacktrace` を含める
-- navigation / JS timeout は `timeout` を返す
-- `WKURLSchemeHandler` の制約により、通常の `http` / `https` response body を network layer で直接捕捉しない
+### Specification notes
+- This bridge is for externally controlling `WKWebView` for scraping and is not a WebDriver BiDi conformance target
+- Unsupported commands return `unknown command`
+- A context other than `main` returns `no such frame`
+- JavaScript failures return `javascript error`; the response includes `message` and `stacktrace` when the JavaScript wrapper can obtain them
+- Navigation and JavaScript timeouts return `timeout`
+- Because of `WKURLSchemeHandler` limitations, ordinary `http` and `https` response bodies are not captured directly at the network layer
 
-## Event
-ページ内の `console.log` / `info` / `warn` / `error` / `debug` を document start の user script で hook し、`session.subscribe` 済みの WebSocket client へ `log.entryAdded` として送る。
+## Events
+A document-start user script hooks page-level `console.log`, `info`, `warn`, `error`, and `debug`, then sends them as `log.entryAdded` to WebSocket clients that have subscribed with `session.subscribe`.
 
 ```json
 {
@@ -375,7 +375,7 @@ BiDi server は長時間起動する操作モードなので、通常の 1 shot 
 
 ## Response schema
 
-success:
+Success:
 
 ```json
 {
@@ -385,7 +385,7 @@ success:
 }
 ```
 
-error:
+Error:
 
 ```json
 {
@@ -396,7 +396,7 @@ error:
 }
 ```
 
-JavaScript error では、取得できる場合に `stacktrace` を追加する:
+For JavaScript errors, include `stacktrace` when available:
 
 ```json
 {
@@ -404,22 +404,22 @@ JavaScript error では、取得できる場合に `stacktrace` を追加する:
   "type": "error",
   "error": "javascript error",
   "message": "ReferenceError: foo is not defined",
-  "stacktrace": "ReferenceError: foo is not defined\n..."
+  "stacktrace": "ReferenceError: foo is not defined\\n..."
 }
 ```
 
-| error | 用途 |
+| error | Use |
 | --- | --- |
-| `unknown command` | 未対応 method |
-| `invalid argument` | params 不正 |
-| `no such frame` | context が `main` 以外 |
-| `javascript error` | JS 評価失敗 |
-| `timeout` | navigation / JS timeout |
-| `unknown error` | WKWebView load failure など、上記に分類できない失敗 |
+| `unknown command` | Unsupported method |
+| `invalid argument` | Invalid params |
+| `no such frame` | Context is not `main` |
+| `javascript error` | JavaScript evaluation failed |
+| `timeout` | Navigation or JavaScript timeout |
+| `unknown error` | Failure such as a WKWebView load failure that does not fit the categories above |
 
-## Request / response 例
+## Request and response examples
 
-### status
+### Status
 ```json
 {
   "id": 1,
@@ -439,7 +439,7 @@ JavaScript error では、取得できる場合に `stacktrace` を追加する:
 }
 ```
 
-### subscribe
+### Subscribe
 ```json
 {
   "id": 2,
@@ -455,7 +455,7 @@ JavaScript error では、取得できる場合に `stacktrace` を追加する:
 }
 ```
 
-### navigate
+### Navigate
 ```json
 {
   "id": 3,
@@ -468,7 +468,7 @@ JavaScript error では、取得できる場合に `stacktrace` を追加する:
 }
 ```
 
-### preload script
+### Preload script
 ```json
 {
   "id": 4,
@@ -490,7 +490,7 @@ JavaScript error では、取得できる場合に `stacktrace` を追加する:
 }
 ```
 
-### screenshot
+### Screenshot
 ```json
 {
   "id": 6,
@@ -501,7 +501,7 @@ JavaScript error では、取得できる場合に `stacktrace` を追加する:
 }
 ```
 
-### viewport
+### Viewport
 ```json
 {
   "id": 7,
@@ -516,7 +516,7 @@ JavaScript error では、取得できる場合に `stacktrace` を追加する:
 }
 ```
 
-### cookies
+### Cookies
 ```json
 {
   "id": 8,
@@ -556,7 +556,7 @@ JavaScript error では、取得できる場合に `stacktrace` を追加する:
 }
 ```
 
-### evaluate
+### Evaluate
 ```json
 {
   "id": 11,
@@ -571,7 +571,7 @@ JavaScript error では、取得できる場合に `stacktrace` を追加する:
 }
 ```
 
-### HTML 取得
+### HTML extraction
 ```json
 {
   "id": 12,
@@ -582,7 +582,7 @@ JavaScript error では、取得できる場合に `stacktrace` を追加する:
 }
 ```
 
-### scraping wait
+### Scraping wait
 ```json
 {
   "id": 13,
@@ -609,7 +609,7 @@ JavaScript error では、取得できる場合に `stacktrace` を追加する:
 }
 ```
 
-### scraping extract
+### Scraping extraction
 ```json
 {
   "id": 15,
@@ -624,7 +624,7 @@ JavaScript error では、取得できる場合に `stacktrace` を追加する:
 }
 ```
 
-response:
+Response:
 
 ```json
 {
@@ -633,53 +633,53 @@ response:
   "result": {
     "mode": "contentOnly",
     "format": "markdown",
-    "data": "# Article title\n\n..."
+    "data": "# Article title\\n\\n..."
   }
 }
 ```
 
-## 実装メモ
-- WebSocket server は SwiftNIO (`NIOCore`, `NIOHTTP1`, `NIOWebSocket`, `NIOPosix`) を使う
-- HTTP upgrade は `/session` のみ受け付ける
-- `BiDiDispatcher` は MainActor 上で `BiDiWebViewHost` を操作する
-- browsing context は現時点で `main` だけ
-- remote value は `JSONValue` に正規化し、response には `result` と簡易互換の `type` / `value` を含める
-- `awaitPromise: true` は `WKWebView.callAsyncJavaScript` を使う
-- preload script は `WKUserContentController` の user script list を再構築して管理する
-- screenshot は `WKSnapshotConfiguration` と `NSBitmapImageRep` による PNG encode を使う
-- runtime cookie は `WKWebsiteDataStore.httpCookieStore` を使う
+## Implementation notes
+- The WebSocket server uses SwiftNIO (`NIOCore`, `NIOHTTP1`, `NIOWebSocket`, `NIOPosix`)
+- Accept HTTP upgrades only at `/session`
+- `BiDiDispatcher` operates on `BiDiWebViewHost` on MainActor
+- The only browsing context currently supported is `main`
+- Normalize remote values to `JSONValue`; responses include `result` plus the simple compatibility fields `type` and `value`
+- `awaitPromise: true` uses `WKWebView.callAsyncJavaScript`
+- Manage preload scripts by rebuilding the `WKUserContentController` user-script list
+- Encode screenshots as PNG with `WKSnapshotConfiguration` and `NSBitmapImageRep`
+- Use `WKWebsiteDataStore.httpCookieStore` for runtime cookies
 
-## 制約
-- Chrome / Firefox の WebDriver BiDi endpoint と完全互換ではない
-- 複数 browsing context、iframe の厳密管理、realm の完全な実装はない
-- network event、request interception、response body 取得、download 制御は未対応
-- screenshot は viewport のみ。scroll view 全体を stitch する full page screenshot は未対応
-- `WKURLSchemeHandler` では通常の `http` / `https` response body を直接捕捉できない
-- `--cookie-jar` は長時間 server mode では保存タイミングが曖昧になるため未対応
+## Constraints
+- This is not fully compatible with Chrome or Firefox WebDriver BiDi endpoints
+- Complete support for multiple browsing contexts, strict iframe management, and all realms is not implemented
+- Network events, request interception, response body retrieval, and download control are unsupported
+- Screenshots cover only the viewport; stitching the full scroll view into a full-page screenshot is unsupported
+- `WKURLSchemeHandler` cannot directly capture ordinary `http` or `https` response bodies
+- `--cookie-jar` is unsupported in long-running server mode because the save timing is ambiguous
 
 ## Security
 
-BiDi server は remote JavaScript execution endpoint を公開する。public interface へ bind する場合は、外部から任意 JavaScript を実行できる前提で扱う。
+The BiDi server exposes a remote JavaScript execution endpoint. If it binds to a public interface, treat it as an endpoint through which external clients can execute arbitrary JavaScript.
 
-推奨:
+Recommendations:
 
-- 既定どおり `--bidi-host 127.0.0.1` を使う
-- remote exposure が必要な場合は token authentication を追加してから使う
-- 必要に応じて allowed origin / target URL を制限する
-- sensitive な browser profile では実行しない
+- Use the default `--bidi-host 127.0.0.1`
+- If remote exposure is required, add token authentication before using it
+- Restrict allowed origins or target URLs when appropriate
+- Do not run it with a sensitive browser profile
 
 ## Crawling policy
 
-利用者は以下を遵守する責任がある。
+Users are responsible for following:
 
-- 対象サイトの terms of service
-- robots.txt / robots policy
-- rate limit
-- 適用される法令・規制
+- The target site's terms of service
+- `robots.txt` and other robots policies
+- Rate limits
+- Applicable laws and regulations
 
-この tool は access control や bot protection の回避を目的にしない。
+This tool is not intended to bypass access controls or bot protection.
 
-## 拡張候補
+## Possible extensions
 - `browsingContext.create`
-- full page screenshot
-- network event の限定的な実装
+- Full-page screenshots
+- Limited network event support

@@ -1,23 +1,23 @@
-# 15. Knowledge Base ソース成果物仕様
+# 15. Knowledge Base Source Artifact Specification
 
-## 目的
-Knowledge Base 向け収集ジョブが出力する成果物の単位、識別子、保存方針を整理する。
+## Purpose
+Define the unit, identifiers, and storage policy for artifacts produced by a collection job that feeds a knowledge base.
 
-このドキュメントは、会話で確定した仕様と、未確定部分に対する推奨案をまとめたものである。
+This document summarizes specifications confirmed in discussion and recommendations for unresolved areas.
 
-## ステータス
-- `確定`: 会話で合意済み
-- `推奨`: 未確定だが現時点の推奨案
+## Status
+- `Confirmed`: agreed in discussion
+- `Recommended`: unresolved, but recommended at present
 
-## 成果物の全体像
-1 回の収集ジョブは次を出力する。
+## Artifact overview
+One collection job produces:
 
-- 不変 run manifest
-- ページ文書
-- PDF 文書
-- ページ文書化に失敗した failed page artifact
+- An immutable run manifest
+- Page documents
+- PDF documents
+- Failed page artifacts for pages that could not be converted to documents
 
-保存例:
+Example storage:
 
 ```text
 runs/<run-id>/
@@ -27,47 +27,47 @@ runs/<run-id>/
   failed-pages/
 ```
 
-## ページ文書
-### 確定
-- 最終成果物は `Markdown + manifest` とする
-- ページ文書は PDF 文書とは別文書として保存する
-- `source_id + version_id` で版管理する
-- `source_id` は `canonical or resolved URL` を軸にし、`origin_url` と `discovered_from` も保持する
-- `version_id` は `content-only HTML` の hash とする
-- ページ文書の正本は `content-only HTML` とみなす
-- `content-only` が空、または 300 文字未満ならページ文書は生成しない
+## Page documents
+### Confirmed
+- The final artifact is `Markdown + manifest`
+- Page documents are stored separately from PDF documents
+- Versions are managed with `source_id + version_id`
+- `source_id` is based on the canonical or resolved URL, and also retains `origin_url` and `discovered_from`
+- `version_id` is the hash of `content-only HTML`
+- `content-only HTML` is the canonical page document source
+- Do not generate a page document when `content-only` is empty or shorter than 300 characters
 
-### 推奨
-- page sidecar metadata に `content_only_hash` と `markdown_path` を保持する
-- v1 では raw HTML の永続保存は必須にしない
+### Recommended
+- Keep `content_only_hash` and `markdown_path` in page sidecar metadata
+- Raw HTML persistence is not required in v1
 
-理由:
+Reason:
 
-- ツールの責務が `収集専用` であり、成果物の主眼が KB 入力にあるため
+- The tool is responsible for collection only, and the artifacts are primarily intended as knowledge-base inputs
 
-## PDF 文書
-### 確定
-- PDF は一次ソースとする
-- 正本は `.pdf` バイナリとする
-- ページ文書とは別文書として保存する
+## PDF documents
+### Confirmed
+- PDFs are primary sources
+- The canonical source is the `.pdf` binary
+- PDFs are stored separately from page documents
 - `source_id = normalized pdf_url`
 - `version_id = content_hash`
-- manifest の必須項目は `doc_id`, `pdf_url`, `downloaded_path`, `parent_page_url`, `link_text`, `content_hash`, `fetched_at`
-- 同一内容の PDF は 1 文書に集約し、`parents[]` を持つ
-- direct PDF は収集対象に含め、`parent_page_url = null` を許可する
+- Required manifest fields are `doc_id`, `pdf_url`, `downloaded_path`, `parent_page_url`, `link_text`, `content_hash`, and `fetched_at`
+- Identical PDF content is consolidated into one document with `parents[]`
+- Direct PDFs are collection targets and may use `parent_page_url = null`
 
-### 推奨
-- `doc_id` は `<source_id>@<version_id>` として manifest 上で一意に扱う
-- direct PDF のときは `discovery_source` を必須にする
+### Recommended
+- Make `doc_id` unique in the manifest as `<source_id>@<version_id>`
+- Require `discovery_source` for direct PDFs
 
-## failed page artifact
-### 確定
-- ページ取得が成功しても `content-only` が失敗した場合、ページ文書は生成しない
-- その代わり failed artifact を残す
-- failed page の存在は PDF 収集の provenance として使ってよい
+## Failed page artifacts
+### Confirmed
+- If page retrieval succeeds but `content-only` fails, do not generate a page document
+- Keep a failed artifact instead
+- A failed page may be used as provenance for PDF collection
 
-### 推奨
-最低限、次を持つ。
+### Recommended
+At minimum, include:
 
 - `source_id`
 - `resolved_url`
@@ -77,13 +77,13 @@ runs/<run-id>/
 - `candidate_text_length`
 - `fetched_at`
 
-## run manifest
-### 確定
-- run ごとに不変の manifest を残す
-- discovery で見つけた候補は `accepted / rejected / skipped` を全部残す
+## Run manifest
+### Confirmed
+- Keep an immutable manifest for each run
+- Keep every candidate found by discovery as `accepted / rejected / skipped`
 
-### 推奨
-最低限、次を持つ。
+### Recommended
+At minimum, include:
 
 - `run_id`
 - `started_at`
@@ -96,7 +96,7 @@ runs/<run-id>/
 - `candidates`
 - `summary`
 
-`summary` の推奨項目:
+Recommended `summary` fields:
 
 - `accepted_pages`
 - `accepted_pdfs`
@@ -105,15 +105,15 @@ runs/<run-id>/
 - `failed_fetch_count`
 - `failed_extraction_count`
 
-## crawl state
-### 確定
-- run manifest とは別に mutable crawl state を持つ
-- 1 レコードは `source_id` ごとの現在状態を表す
-- `skip-unchanged` は `事前判定 + 取得後判定` とする
-- ページ文書は保守的に扱い、原則フル取得後に unchanged を判定する
+## Crawl state
+### Confirmed
+- Keep mutable crawl state separately from the run manifest
+- Each record represents the current state for one `source_id`
+- Implement `skip-unchanged` as a pre-fetch check plus a post-fetch check
+- Treat page documents conservatively and generally determine unchanged status after a full fetch
 
-### 推奨
-最低限、次を持つ。
+### Recommended
+At minimum, include:
 
 - `source_id`
 - `document_type`
@@ -125,25 +125,25 @@ runs/<run-id>/
 - `last_modified`
 - `failure_count`
 
-保存方式の推奨:
+Recommended storage:
 
-- mutable state は SQLite
+- Store mutable state in SQLite
 
-## 推奨する URL 正規化
-### page
-- `rel=canonical` があればそれを優先する
-- なければ resolved URL を使う
-- `fragment` を除去する
-- `utm_*` など tracking query を除去する
-- host を小文字化する
+## Recommended URL normalization
+### Page
+- Prefer `rel=canonical` when present
+- Otherwise use the resolved URL
+- Remove `fragment`
+- Remove tracking queries such as `utm_*`
+- Lowercase the host
 
-### pdf
-- normalized pdf URL を `source_id` に使う
-- `fragment` を除去する
-- tracking query を除去する
-- file extension の有無は path 実体を優先して扱う
+### PDF
+- Use the normalized PDF URL as `source_id`
+- Remove `fragment`
+- Remove tracking queries
+- Prefer the actual path over the presence or absence of a file extension
 
-## 推奨する decision reason
+## Recommended decision reasons
 - `accepted`
 - `rejected_allowlist`
 - `rejected_depth`
@@ -157,22 +157,22 @@ runs/<run-id>/
 - `timeout`
 - `robots_disallowed`
 
-## 推奨する scheduler
-`PDF 優先` を前提に、次を推奨する。
+## Recommended scheduler
+Assuming `PDF first`, use this order:
 
-1. direct PDF seed / discovery result
-2. explicit seed page
-3. seed page から見つかった PDF
-4. hop 1 page
-5. hop 1 page から見つかった PDF
-6. hop 2 page
-7. hop 2 page から見つかった PDF
+1. Direct PDF seed or discovery result
+2. Explicit seed page
+3. PDFs found from a seed page
+4. Hop 1 page
+5. PDFs found from a hop 1 page
+6. Hop 2 page
+7. PDFs found from a hop 2 page
 
-補足:
+Notes:
 
-- `親ページ provenance` と `PDF 優先` の両立を狙う
-- 実装時には queue の優先度を明示する
+- This balances parent-page provenance with `PDF first`
+- The implementation should make queue priorities explicit
 
-## 関連ドキュメント
-- [13. Knowledge Base 向け改善ロードマップ](13-knowledge-base-roadmap.md)
-- [14. 検索結果からの収集](14-search-discovery.md)
+## Related documents
+- [13. Knowledge Base Improvement Roadmap](13-knowledge-base-roadmap.md)
+- [14. Search Result Discovery](14-search-discovery.md)

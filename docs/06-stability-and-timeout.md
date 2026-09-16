@@ -1,39 +1,39 @@
-# 06. 安定性とタイムアウト制御
+# 06. Stability and Timeout Control
 
-## 目的
-ページロード失敗、待機無限化、セッション汚染などの運用リスクを抑え、繰り返し実行に耐える基盤を用意する。
+## Purpose
+Reduce operational risks such as page-load failures, waits that never finish, and session contamination, and provide a foundation that tolerates repeated execution.
 
-## 要件
-- ページロード失敗時のハンドリングがあること
-- タイムアウト制御があること
-- JS レンダリング待機が永遠に終わらないケースに備えること
-- 必要に応じてセッションを破棄または再利用できること
+## Requirements
+- Handle page-load failures
+- Provide timeout control
+- Protect against JavaScript rendering waits that never finish
+- Allow sessions to be discarded or reused when appropriate
 
-## 実装済みタイムアウト
-- `--load-timeout`: ページロード段階。既定 30 秒
-- `--wait-timeout`: 描画待機全体。既定 15 秒
-- `--js-timeout`: `evaluateJavaScript` 全般。既定 10 秒
+## Implemented timeouts
+- `--load-timeout`: page-loading stage; defaults to 30 seconds
+- `--wait-timeout`: overall rendering wait; defaults to 15 seconds
+- `--js-timeout`: all `evaluateJavaScript` calls; defaults to 10 seconds
 
-## 安定化方針
-- 既定では `WKWebsiteDataStore.nonPersistent()` を用いて状態持ち越しを抑える
-- ロード、待機、抽出の各段階に個別の失敗扱いを定義する
-- 固定待機、条件待機、DOM 安定待機は同じ `--wait-timeout` に収める
-- 待機条件評価、DOM 安定確認、最終抽出はすべて `--js-timeout` の対象とする
-- 最大待機時間を超えたら明示的にタイムアウトとする
-- 終了時に WebView を破棄、または再利用キューへ戻す
+## Stabilization policy
+- By default, use `WKWebsiteDataStore.nonPersistent()` to limit state carryover
+- Define separate failure handling for loading, waiting, and extraction
+- Keep fixed waits, conditional waits, and DOM stability waits within the same `--wait-timeout`
+- Apply `--js-timeout` to wait-condition evaluation, DOM stability checks, and final extraction
+- Treat exceeding the maximum wait as an explicit timeout
+- At the end, destroy the WebView or return it to a reuse queue
 
-## 失敗ケース
-- URL ロード失敗
-- Cookie 注入失敗
-- セレクタ出現待機のタイムアウト
-- DOM 安定待機のタイムアウト
-- JavaScript 実行失敗
+## Failure cases
+- URL loading failure
+- Cookie injection failure
+- Timeout while waiting for a selector
+- Timeout while waiting for DOM stability
+- JavaScript execution failure
 
-## 完了条件
-- 成功時と失敗時の終了パスが分かれており、呼び出し側へ結果を返せること
+## Completion criteria
+- Success and failure paths are distinct and a result can be returned to the caller
 
-## 注意点
-- 認証状態の再現は Cookie だけで完結しない場合がある
-- `--persistent-store` を使うとセッション再利用はしやすいが、状態汚染の切り分けは難しくなる
-- `--wait-delay` を長く取りすぎると明示条件評価や DOM 安定待機の予算を圧迫する
-- リトライ方針は対象サイトの性質を見て後続フェーズで詰める
+## Notes
+- Reproducing authentication state may require more than cookies
+- `--persistent-store` makes session reuse easier but makes state contamination harder to isolate
+- An overly long `--wait-delay` can consume the budget available for explicit condition checks and DOM stability waits
+- The retry policy should be refined in a later phase based on the target site's behavior

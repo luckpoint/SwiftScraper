@@ -1,39 +1,39 @@
-# 14. 検索結果からの収集
+# 14. Search Result Discovery
 
-## 目的
-query を起点に検索結果ページから候補 URL / PDF を集め、そのまま SwiftScraper の収集ジョブへ流し込めるようにする。
+## Purpose
+Collect candidate URLs and PDFs from search-result pages starting from a query, then pass them directly into a SwiftScraper collection job.
 
-この機能は、当初の「ウェブから情報収集してナレッジベースのソースを作る」という用途に最も近い拡張である。
+This is the extension closest to the original use case of collecting information from the web and creating knowledge-base sources.
 
-## 現時点で確定している前提
-### 入力
-- 収集ジョブの入口は `既知 URL` と `検索クエリ` の両方を持つ
-- discovery はそのうち `検索クエリ` 起点の入口を担う
+## Confirmed assumptions
+### Inputs
+- A collection job accepts both known URLs and search queries
+- Discovery provides the search-query entry point
 
-### 探索対象
-- discovery で採用する対象は `allowlist ドメインのみ`
-- 一般 Web 全体への拡張は行わない
+### Discovery scope
+- Discovery accepts candidates only from allowlisted domains
+- It does not expand to the entire public web
 
-### 深さと上限
-- link expansion は既定 `1 hop`
-- 実行時に `0-2 hop` を指定可能
-- 停止条件は `max-pages` と `max-pdfs`
+### Depth and limits
+- Link expansion defaults to `1 hop`
+- Runtime configuration may select `0-2 hop`
+- The stopping conditions are `max-pages` and `max-pdfs`
 
-### 保存方針
-- 発見した候補は `accepted / rejected / skipped` を全部 run artifact に残す
-- direct PDF URL も discovery の採用対象に含める
-- direct PDF の場合は `parent_page_url = null` を許可する
+### Storage policy
+- Keep all discovered candidates as `accepted / rejected / skipped` in the run artifact
+- Direct PDF URLs are eligible discovery targets
+- For direct PDFs, allow `parent_page_url = null`
 
-## 現状
-現時点では Google / Yahoo! JAPAN 向けの probe script があり、BiDi bridge 経由で検索結果抽出の土台はある。
+## Current status
+Probe scripts for Google and Yahoo! JAPAN provide a foundation for extracting search results through the BiDi bridge.
 
 - `scripts/puppeteer-google-search.mjs`
 - `scripts/puppeteer-yahoo-search.mjs`
 
-ただし、これは確認用スクリプトであり、CLI 本体の discovery workflow には統合されていない。
+These are verification scripts and are not integrated into the CLI's discovery workflow.
 
-## 目標 UX
-### discovery 単体
+## Target UX
+### Discovery only
 ```bash
 swift run swift-scraper -- \
   --discover "swift web scraping" \
@@ -44,7 +44,7 @@ swift run swift-scraper -- \
   --output out/discovery.json
 ```
 
-### discovery から scrape へ直結
+### Directly from discovery to scraping
 ```bash
 swift run swift-scraper -- \
   --discover "swift web scraping" \
@@ -59,7 +59,7 @@ swift run swift-scraper -- \
   --output out/knowledge-run.json
 ```
 
-### discovery と crawl state の併用
+### Discovery with crawl state
 ```bash
 swift run swift-scraper -- \
   --discover "swift web scraping" \
@@ -74,8 +74,8 @@ swift run swift-scraper -- \
   --markdown
 ```
 
-## CLI 設計
-### discovery 入力
+## CLI design
+### Discovery inputs
 - `--discover <query>`
 - `--provider <name>`
 - `--allow-host <host>`
@@ -85,11 +85,11 @@ swift run swift-scraper -- \
 - `--max-pdfs <count>`
 - `--skip-unchanged`
 
-### discovery 出力モード
-- `results-only`: discovery 結果のみ返す
-- `scrape`: discovery 結果をそのまま収集ジョブへ流し、run manifest を返す
+### Discovery output modes
+- `results-only`: return discovery results only
+- `scrape`: pass discovery results into a collection job and return the run manifest
 
-## 内部モデル
+## Internal model
 ### DiscoveryCandidate
 - `candidate_type`: `page` | `pdf`
 - `url`
@@ -118,33 +118,33 @@ swift run swift-scraper -- \
 - `candidates[]`
 - `errors[]`
 
-## 発見から収集までの流れ
-1. query から検索結果一覧を取得する
-2. allowlist に合わない URL を `rejected_allowlist` にする
-3. direct PDF と page URL を candidate として分離する
-4. duplicate を潰す
-5. crawl state で `skip-unchanged` 候補を判定する
-6. `max-pages` / `max-pdfs` に基づき採用対象を決める
-7. accepted / rejected / skipped を全部 run artifact に残す
-8. accepted だけを収集フェーズへ渡す
+## Flow from discovery to collection
+1. Fetch the search-result list for the query
+2. Mark URLs outside the allowlist as `rejected_allowlist`
+3. Separate direct PDFs and page URLs into candidates
+4. Remove duplicates
+5. Use crawl state to identify `skip-unchanged` candidates
+6. Select accepted candidates according to `max-pages` and `max-pdfs`
+7. Keep all accepted, rejected, and skipped candidates in the run artifact
+8. Pass only accepted candidates to the collection phase
 
-## direct PDF の扱い
-- direct PDF は発見対象に含める
-- `parent_page_url` は `null` を許可する
-- provenance は `discovery_source=query|seed` を必須にする
-- HTML 親ページ由来 PDF と同じ PDF 文書に集約される可能性がある
+## Handling direct PDFs
+- Include direct PDFs in discovery targets
+- Allow `parent_page_url` to be `null`
+- Require `discovery_source=query|seed` for provenance
+- A direct PDF may be consolidated into the same PDF document as one found through an HTML parent page
 
-## 推奨する provider 実装方針
-### 初期段階
-- `Yahoo! JAPAN` を優先する
-- 既存 Node/Puppeteer probe を JSON 出力対応して流用する
-- Swift 本体は provider ごとの JSON 契約を decode する責務を持つ
+## Recommended provider implementation
+### Initial phase
+- Prioritize `Yahoo! JAPAN`
+- Adapt the existing Node/Puppeteer probe to output JSON
+- Make the Swift core responsible for decoding each provider's JSON contract
 
-### 後段
-- provider 抽象を Swift 側へ寄せる
-- Google provider を正式化する
+### Later phase
+- Move the provider abstraction into Swift
+- Formalize the Google provider
 
-## 推奨する失敗理由
+## Recommended failure reasons
 - `blocked`
 - `layout-changed`
 - `empty-results`
@@ -156,39 +156,39 @@ swift run swift-scraper -- \
 - `rejected_duplicate`
 - `skipped_unchanged`
 
-## 推奨する優先順位
-`PDF 優先` を具体化するため、次の順を推奨する。
+## Recommended priority
+The following order makes the `PDF first` policy concrete:
 
-1. direct PDF seed / discovery result
-2. 明示 seed HTML page
-3. 明示 seed page から見つかった PDF
-4. hop 1 HTML page
-5. hop 1 から見つかった PDF
-6. hop 2 HTML page
-7. hop 2 から見つかった PDF
+1. Direct PDF seed or discovery result
+2. Explicit seed HTML page
+3. PDFs found from an explicit seed page
+4. Hop 1 HTML page
+5. PDFs found from hop 1
+6. Hop 2 HTML page
+7. PDFs found from hop 2
 
-備考:
+Notes:
 
-- これは `PDF 優先` と `親ページ provenance` を両立しやすい暫定案である
-- 実装時には `max-pages` / `max-pdfs` の消費順を明文化する
+- This is a provisional plan that balances `PDF first` with parent-page provenance
+- The implementation should document the order in which `max-pages` and `max-pdfs` are consumed
 
-## テスト方針
-### ユニットテスト
-- provider JSON の decode
-- allowlist filter
-- duplicate 判定
-- accepted / rejected / skipped の分類
+## Testing policy
+### Unit tests
+- Decode provider JSON
+- Apply the allowlist filter
+- Detect duplicates
+- Classify accepted, rejected, and skipped candidates
 
-### 結合テスト
-- ローカル fixture HTML での discovery result 抽出
-- discovery 結果から scrape queue への接続
+### Integration tests
+- Extract discovery results from local fixture HTML
+- Connect discovery results to the scrape queue
 
-### 手動 smoke test
+### Manual smoke tests
 - `yahoo`
 - `google`
 
-実サイト依存テストは CI の主軸には置かない。
+Tests that depend on live sites are not the primary focus of CI.
 
-## 関連ドキュメント
-- [13. Knowledge Base 向け改善ロードマップ](13-knowledge-base-roadmap.md)
-- [15. Knowledge Base ソース成果物仕様](15-kb-source-spec.md)
+## Related documents
+- [13. Knowledge Base Improvement Roadmap](13-knowledge-base-roadmap.md)
+- [15. Knowledge Base Source Artifact Specification](15-kb-source-spec.md)

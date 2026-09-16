@@ -1,35 +1,35 @@
-# 05. ユーザー露出の抑制
+# 05. Limiting User Exposure
 
-## 目的
-スクレイピング処理の存在を過度に意識させず、ユーザーの通常作業を妨げない実行形態を提供する。
+## Purpose
+Provide an execution mode that does not draw excessive attention to scraping and does not interrupt the user's normal work.
 
-## 要件
-- 可能な限りウィンドウを表示しないこと
-- フォーカスを奪わないこと
-- ユーザーの操作を妨げないこと
-- 完全不可視までは要求しないこと
+## Requirements
+- Avoid showing a window whenever possible
+- Do not steal focus
+- Do not interfere with user interaction
+- Do not require complete invisibility
 
-## 実装済みモード
-- `--visibility windowless`: ウィンドウを作らず `WKWebView` だけを保持する
-- `--visibility hidden-window`: ウィンドウを作るが `orderOut(nil)` で非表示運用する
-- `--visibility visible-window`: 通常ウィンドウとして表示する
+## Implemented modes
+- `--visibility windowless`: keep only `WKWebView` without creating a window
+- `--visibility hidden-window`: create a window but hide it with `orderOut(nil)`
+- `--visibility visible-window`: show a normal window
 
-## 優先順位
-1. ウィンドウを出さずに WebView を保持する
-2. 非表示ウィンドウ上で動作させる
-3. 必要時のみ最背面ウィンドウで表示する
+## Priority
+1. Keep the WebView without showing a window
+2. Run it in a hidden window
+3. Show it in a window at the back only when necessary
 
-## 運用指針
-- `windowless` / `hidden-window` では前面アプリとしての振る舞いを弱める
-- `visible-window` は開発確認を優先する時だけ選ぶ
-- アプリを強制的にアクティブ化しない
-- ウィンドウを key/front にしない
-- 不自然な透明化や極端なオフスクリーン配置は避ける
+## Operating guidance
+- In `windowless` and `hidden-window` modes, minimize behavior that makes the app the frontmost application
+- Choose `visible-window` only when development inspection is more important
+- Do not force the app to become active
+- Do not make the window key or bring it to the front
+- Avoid unnatural transparency and extreme off-screen placement
 
-## 完了条件
-- ユーザーの視界や入力操作への影響を最小化した状態で処理を実行できること
+## Completion criteria
+- Processing can run while minimizing its impact on the user's view and input
 
-## 注意点
-- 最背面化だけでは Mission Control などで見える可能性がある
-- `hidden-window` は OS 管理上の痕跡まで消すものではない
-- 主目的は完全な隠蔽ではなく、邪魔をしないことに置く
+## Notes
+- A backmost window may still be visible in Mission Control or other window-management views
+- `hidden-window` does not remove every trace from OS-level window management
+- The goal is to avoid interference rather than to guarantee complete concealment
