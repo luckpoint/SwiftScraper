@@ -1,5 +1,42 @@
 #!/usr/bin/env python3
-"""Stage successful SwiftScraper PDF downloads in a Google Drive sync folder."""
+"""EXAMPLE: stage verified SwiftScraper PDFs into a cloud sync folder.
+
+This is a reference example, not part of the SwiftScraper CLI. It shows one way
+to post-process a PDF download run: re-verify every PDF the run reported as
+successful, then move the good ones into a fresh folder that a sync client
+(Google Drive, Dropbox, ...) uploads for you -- for example to feed a NotebookLM
+notebook. Copy it and adapt it to your own workflow.
+
+Prerequisites
+-------------
+1. Python 3.9+. No third-party packages are required.
+2. A completed SwiftScraper PDF download run, which produces the result JSON:
+
+       swift run swift-scraper -- https://example.com/legal/ \
+           --download-pdfs downloads > result.json
+
+   `--download-linked-pdfs <dir>` writes `<dir>/pdf-downloads.json` instead.
+   Either file works, as do both the single-page and the batch result shapes.
+3. A destination root that already exists and is watched by your sync client.
+   It must live OUTSIDE the download output directory, or the script refuses
+   to run.
+
+Usage
+-----
+    python3 stage_verified_pdfs.py result.json ~/GoogleDrive/NotebookLM \
+        --run-name okta-2026-09 [--dry-run]
+
+Behavior
+--------
+- Only entries with `success: true` and an `outputPath` are staged.
+- Each file is verified: exists, `.pdf` suffix, non-empty, `%PDF-` magic bytes.
+- Every file is verified before the first move, so one bad file aborts the run
+  with nothing moved.
+- Files are MOVED, not copied; they no longer exist in the download directory.
+- Staged paths keep their layout relative to the run's `outputDirectory`.
+- `--run-name` must name a folder that does not exist yet.
+- A JSON summary goes to stdout. `--dry-run` prints it without touching files.
+"""
 
 from __future__ import annotations
 
