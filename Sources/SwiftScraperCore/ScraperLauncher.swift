@@ -328,6 +328,7 @@ public final class ScraperLauncher {
                 timeout: configuration.timeouts.load,
                 customHeaders: configuration.customHeaders,
                 overwriteExistingFiles: configuration.overwritePDFs,
+                maximumSizeMegabytes: configuration.maxPDFSizeMegabytes,
                 logger: logger
             )
             let result = try await saver.save(pdfLinks)

@@ -123,6 +123,7 @@ final class PDFDownloadSaverTests: XCTestCase {
             timeout: 1,
             customHeaders: [:],
             overwriteExistingFiles: true,
+            maximumSizeMegabytes: PDFDownloadResponseGuard.defaultMaximumMegabytes,
             logger: StderrLogger(verbose: false)
         )
         let collection = PDFLinkCollection(
@@ -141,6 +142,93 @@ final class PDFDownloadSaverTests: XCTestCase {
                 atPath: pageOutputDirectory.appendingPathComponent("Report-report-2.pdf").path
             )
         )
+    }
+
+    func testLocalFileCopyIsNotSubjectToResponseValidation() async throws {
+        let rootDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SwiftScraperTests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let sourceDirectory = rootDirectory.appendingPathComponent("source", isDirectory: true)
+        let outputDirectory = rootDirectory.appendingPathComponent("downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceDirectory, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: rootDirectory)
+        }
+
+        let sourcePDFURL = sourceDirectory.appendingPathComponent("report.pdf")
+        try Data("not a pdf".utf8).write(to: sourcePDFURL)
+
+        let saver = PDFDownloadSaver(
+            outputDirectory: outputDirectory,
+            timeout: 1,
+            customHeaders: [:],
+            overwriteExistingFiles: false,
+            maximumSizeMegabytes: 1,
+            logger: StderrLogger(verbose: false)
+        )
+        let collection = PDFLinkCollection(
+            sourceURL: URL(string: "https://example.com/legal/")!,
+            links: [PDFLinkCandidate(url: sourcePDFURL, text: "Report")],
+            userAgent: nil,
+            cookies: []
+        )
+
+        let result = try await saver.save(collection)
+
+        XCTAssertTrue(result.files[0].success)
+        XCTAssertEqual(try String(contentsOf: sourcePDFURL, encoding: .utf8), "not a pdf")
+    }
+}
+
+final class PDFDownloadResponseGuardTests: XCTestCase {
+    private func pdf(byteCount: Int) -> Data {
+        var data = Data("%PDF-".utf8)
+        data.append(Data(repeating: 0x41, count: max(0, byteCount - data.count)))
+        return data
+    }
+
+    func testValidPDFWithinLimitPasses() {
+        XCTAssertNil(PDFDownloadResponseGuard.failure(for: pdf(byteCount: 16), maximumBytes: 32))
+    }
+
+    func testBareMagicBytesArePassed() {
+        XCTAssertNil(PDFDownloadResponseGuard.failure(for: Data("%PDF-".utf8), maximumBytes: 5))
+    }
+
+    func testHTMLResponseIsRejected() {
+        let failure = PDFDownloadResponseGuard.failure(for: Data("<!DOCTYPE html>".utf8), maximumBytes: 1024)
+        XCTAssertEqual(failure, .notPDF)
+        XCTAssertEqual(failure?.message, "Response is not a PDF (missing %PDF- header)")
+    }
+
+    func testEmptyResponseIsRejected() {
+        XCTAssertEqual(PDFDownloadResponseGuard.failure(for: Data(), maximumBytes: 1024), .notPDF)
+    }
+
+    func testTruncatedMagicIsRejected() {
+        XCTAssertEqual(PDFDownloadResponseGuard.failure(for: Data("%PDF".utf8), maximumBytes: 1024), .notPDF)
+    }
+
+    func testSizeExactlyAtLimitPasses() {
+        XCTAssertNil(PDFDownloadResponseGuard.failure(for: pdf(byteCount: 8), maximumBytes: 8))
+    }
+
+    func testSizeOneByteOverLimitIsRejected() {
+        let failure = PDFDownloadResponseGuard.failure(for: pdf(byteCount: 9), maximumBytes: 8)
+        XCTAssertEqual(failure, .tooLarge(byteCount: 9, maximumBytes: 8))
+        XCTAssertEqual(
+            failure?.message,
+            "Response is 9 bytes, above the 8 byte limit (--max-pdf-size)"
+        )
+    }
+
+    func testOversizedNonPDFReportsNotPDF() {
+        let html = Data(repeating: 0x41, count: 64)
+        XCTAssertEqual(PDFDownloadResponseGuard.failure(for: html, maximumBytes: 8), .notPDF)
+    }
+
+    func testMegabytesUseBinaryUnits() {
+        XCTAssertEqual(PDFDownloadResponseGuard.maximumBytes(forMegabytes: 100), 104_857_600)
     }
 }
 

@@ -52,6 +52,10 @@ public enum CLIParser {
                 state.linkedPDFDownloadDirectory = resolvePath(raw)
             case "--overwrite-pdfs":
                 state.overwritePDFs = true
+            case "--max-pdf-size":
+                let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
+                state.maxPDFSizeSpecified = true
+                state.maxPDFSizeMegabytes = try parseMaxPDFSize(raw, option: argument)
             case "--url":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 try ensureSingleURL(existing: state.url)
@@ -247,6 +251,8 @@ public enum CLIParser {
         var imageDebug = false
         var extractionFlagCount = 0
         var overwritePDFs = false
+        var maxPDFSizeMegabytes = PDFDownloadResponseGuard.defaultMaximumMegabytes
+        var maxPDFSizeSpecified = false
         var prettyPrint = false
         var verbose = false
 
@@ -261,6 +267,10 @@ public enum CLIParser {
 
             if overwritePDFs && pdfDownloadDirectory == nil && linkedPDFDownloadDirectory == nil {
                 throw ScraperError.invalidArgument("`--overwrite-pdfs` requires `--download-pdfs` or `--download-linked-pdfs`")
+            }
+
+            if maxPDFSizeSpecified && pdfDownloadDirectory == nil && linkedPDFDownloadDirectory == nil {
+                throw ScraperError.invalidArgument("`--max-pdf-size` requires `--download-pdfs` or `--download-linked-pdfs`")
             }
 
             if bidiServer && pdfInputPath != nil {
@@ -380,6 +390,7 @@ public enum CLIParser {
                     timeouts: timeouts,
                     batch: batch,
                     overwritePDFs: overwritePDFs,
+                    maxPDFSizeMegabytes: maxPDFSizeMegabytes,
                     verbose: verbose
                 )
             )
@@ -462,6 +473,7 @@ public enum CLIParser {
                     imageExtraction: imageExtraction,
                     linkedPDFDownloadDirectory: linkedPDFDownloadDirectory,
                     overwritePDFs: overwritePDFs,
+                    maxPDFSizeMegabytes: maxPDFSizeMegabytes,
                     prettyPrint: prettyPrint,
                     verbose: verbose
                 )
@@ -601,6 +613,7 @@ public enum CLIParser {
       --download-pdfs <directory>    Save PDF links found on the page
       --download-linked-pdfs <dir>   Save PDF links alongside normal extraction
       --overwrite-pdfs               Replace existing PDFs instead of avoiding name collisions
+      --max-pdf-size <megabytes>     Reject PDFs above this size before writing; defaults to 100 (1 MB = 1048576 bytes)
       --body-text                    Extract document.body.innerText
       --selector-inner-html <css>    Extract innerHTML from selected elements
       --content-only                 Extract content HTML without header, footer or sidebar
@@ -813,6 +826,18 @@ public enum CLIParser {
         }
 
         return port
+    }
+
+    private static func parseMaxPDFSize(_ raw: String, option: String) throws -> Int {
+        let megabytes = try parsePositiveInt(raw, option: option)
+
+        guard megabytes <= PDFDownloadResponseGuard.maximumMegabytesLimit else {
+            throw ScraperError.invalidArgument(
+                "\(option) must be between 1 and \(PDFDownloadResponseGuard.maximumMegabytesLimit)"
+            )
+        }
+
+        return megabytes
     }
 
     private static func parseBoolean(_ raw: String, key: String) throws -> Bool {

@@ -199,6 +199,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
     public let imageExtraction: ImageExtractionConfiguration
     public let linkedPDFDownloadDirectory: URL?
     public let overwritePDFs: Bool
+    public let maxPDFSizeMegabytes: Int
     public let prettyPrint: Bool
     public let verbose: Bool
 
@@ -219,6 +220,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
         imageExtraction: ImageExtractionConfiguration = .disabled,
         linkedPDFDownloadDirectory: URL? = nil,
         overwritePDFs: Bool = false,
+        maxPDFSizeMegabytes: Int = PDFDownloadResponseGuard.defaultMaximumMegabytes,
         prettyPrint: Bool,
         verbose: Bool
     ) {
@@ -238,6 +240,7 @@ public struct ScraperConfiguration: Equatable, Sendable {
         self.imageExtraction = imageExtraction
         self.linkedPDFDownloadDirectory = linkedPDFDownloadDirectory
         self.overwritePDFs = overwritePDFs
+        self.maxPDFSizeMegabytes = maxPDFSizeMegabytes
         self.prettyPrint = prettyPrint
         self.verbose = verbose
     }
@@ -262,6 +265,7 @@ extension ScraperConfiguration {
             imageExtraction: imageExtraction,
             linkedPDFDownloadDirectory: linkedPDFDownloadDirectory,
             overwritePDFs: overwritePDFs,
+            maxPDFSizeMegabytes: maxPDFSizeMegabytes,
             prettyPrint: prettyPrint,
             verbose: verbose
         )
@@ -293,6 +297,7 @@ public struct PDFDownloadConfiguration: Equatable, Sendable {
     public let timeouts: Timeouts
     public let batch: BatchMode?
     public let overwritePDFs: Bool
+    public let maxPDFSizeMegabytes: Int
     public let verbose: Bool
 
     public init(
@@ -308,6 +313,7 @@ public struct PDFDownloadConfiguration: Equatable, Sendable {
         timeouts: Timeouts,
         batch: BatchMode? = nil,
         overwritePDFs: Bool = false,
+        maxPDFSizeMegabytes: Int = PDFDownloadResponseGuard.defaultMaximumMegabytes,
         verbose: Bool
     ) {
         self.url = url
@@ -322,6 +328,7 @@ public struct PDFDownloadConfiguration: Equatable, Sendable {
         self.timeouts = timeouts
         self.batch = batch
         self.overwritePDFs = overwritePDFs
+        self.maxPDFSizeMegabytes = maxPDFSizeMegabytes
         self.verbose = verbose
     }
 }

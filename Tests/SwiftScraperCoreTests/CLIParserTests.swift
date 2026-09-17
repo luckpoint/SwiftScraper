@@ -765,6 +765,105 @@ final class CLIParserTests: XCTestCase {
         XCTAssertTrue(config.overwritePDFs)
     }
 
+    func testDownloadPDFsParsesMaxPDFSize() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/legal/",
+            "--download-pdfs", "downloads",
+            "--max-pdf-size", "25",
+        ])
+
+        guard case .downloadPDFs(let config) = command else {
+            return XCTFail("downloadPDFs command expected")
+        }
+
+        XCTAssertEqual(config.maxPDFSizeMegabytes, 25)
+    }
+
+    func testDownloadPDFsDefaultsMaxPDFSize() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/legal/",
+            "--download-pdfs", "downloads",
+        ])
+
+        guard case .downloadPDFs(let config) = command else {
+            return XCTFail("downloadPDFs command expected")
+        }
+
+        XCTAssertEqual(config.maxPDFSizeMegabytes, 100)
+    }
+
+    func testDownloadPDFsCarriesMaxPDFSizeIntoBatchPages() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/docs",
+            "--sitemap",
+            "--download-pdfs", "downloads",
+            "--max-pdf-size", "25",
+        ])
+
+        guard case .downloadPDFs(let config) = command else {
+            return XCTFail("downloadPDFs command expected")
+        }
+
+        let pageURL = URL(string: "https://example.com/docs/a")!
+        XCTAssertEqual(config.replacing(url: pageURL, batch: nil).maxPDFSizeMegabytes, 25)
+    }
+
+    func testDownloadLinkedPDFsParsesMaxPDFSize() throws {
+        let command = try CLIParser.parse(arguments: [
+            "https://example.com/legal/",
+            "--download-linked-pdfs", "downloads",
+            "--max-pdf-size", "25",
+        ])
+
+        guard case .run(let config) = command else {
+            return XCTFail("run command expected")
+        }
+
+        XCTAssertEqual(config.maxPDFSizeMegabytes, 25)
+        XCTAssertEqual(config.replacing(url: config.url, batch: nil).maxPDFSizeMegabytes, 25)
+    }
+
+    func testMaxPDFSizeRequiresPDFDownloadMode() throws {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: ["https://example.com", "--max-pdf-size", "25"])
+        ) { error in
+            XCTAssertEqual(
+                error as? ScraperError,
+                .invalidArgument("`--max-pdf-size` requires `--download-pdfs` or `--download-linked-pdfs`")
+            )
+        }
+    }
+
+    func testMaxPDFSizeRejectsNonInteger() throws {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com", "--download-pdfs", "downloads", "--max-pdf-size", "big",
+            ])
+        ) { error in
+            XCTAssertEqual(error as? ScraperError, .invalidArgument("--max-pdf-size must be an integer"))
+        }
+    }
+
+    func testMaxPDFSizeRejectsZero() throws {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com", "--download-pdfs", "downloads", "--max-pdf-size", "0",
+            ])
+        ) { error in
+            XCTAssertEqual(error as? ScraperError, .invalidArgument("--max-pdf-size must be 1 or greater"))
+        }
+    }
+
+    func testMaxPDFSizeRejectsValueAboveUpperBound() throws {
+        XCTAssertThrowsError(
+            try CLIParser.parse(arguments: [
+                "https://example.com", "--download-pdfs", "downloads", "--max-pdf-size", "4097",
+            ])
+        ) { error in
+            XCTAssertEqual(error as? ScraperError, .invalidArgument("--max-pdf-size must be between 1 and 4096"))
+        }
+    }
+
     func testDownloadLinkedPDFsParsesSitemapBatch() throws {
         let command = try CLIParser.parse(arguments: [
             "https://example.com/docs",

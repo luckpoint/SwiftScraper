@@ -325,11 +325,51 @@ enum PDFDownloadRequestBuilder {
 
 }
 
+public enum PDFDownloadResponseGuard {
+    public static let defaultMaximumMegabytes = 100
+
+    static let bytesPerMegabyte = 1_048_576
+    static let maximumMegabytesLimit = 4096
+
+    private static let header = Array("%PDF-".utf8)
+
+    enum Failure: Equatable {
+        case notPDF
+        case tooLarge(byteCount: Int, maximumBytes: Int)
+
+        var message: String {
+            switch self {
+            case .notPDF:
+                return "Response is not a PDF (missing %PDF- header)"
+            case .tooLarge(let byteCount, let maximumBytes):
+                return "Response is \(byteCount) bytes, above the \(maximumBytes) byte limit (--max-pdf-size)"
+            }
+        }
+    }
+
+    static func maximumBytes(forMegabytes megabytes: Int) -> Int {
+        megabytes * bytesPerMegabyte
+    }
+
+    static func failure(for data: Data, maximumBytes: Int) -> Failure? {
+        guard data.starts(with: header) else {
+            return .notPDF
+        }
+
+        guard data.count <= maximumBytes else {
+            return .tooLarge(byteCount: data.count, maximumBytes: maximumBytes)
+        }
+
+        return nil
+    }
+}
+
 struct PDFDownloadSaver {
     let outputDirectory: URL
     let timeout: TimeInterval
     let customHeaders: [String: String]
     let overwriteExistingFiles: Bool
+    let maximumSizeMegabytes: Int
     let logger: StderrLogger
 
     func save(_ collection: PDFLinkCollection) async throws -> PDFDownloadRunResult {
@@ -425,6 +465,13 @@ struct PDFDownloadSaver {
         if let httpResponse = response as? HTTPURLResponse,
            !(200..<300).contains(httpResponse.statusCode) {
             throw ScraperError.pdfDownloadFailed("HTTP \(httpResponse.statusCode)")
+        }
+
+        if let failure = PDFDownloadResponseGuard.failure(
+            for: data,
+            maximumBytes: PDFDownloadResponseGuard.maximumBytes(forMegabytes: maximumSizeMegabytes)
+        ) {
+            throw ScraperError.pdfDownloadFailed(failure.message)
         }
 
         do {
@@ -644,6 +691,7 @@ extension PDFDownloadConfiguration {
             timeouts: timeouts,
             batch: batch,
             overwritePDFs: overwritePDFs,
+            maxPDFSizeMegabytes: maxPDFSizeMegabytes,
             verbose: verbose
         )
     }
@@ -664,7 +712,8 @@ extension PDFDownloadConfiguration {
             outputFormat: .plain,
             extraction: .outerHTML,
             imageExtraction: .disabled,
-            overwritePDFs: false,
+            overwritePDFs: overwritePDFs,
+            maxPDFSizeMegabytes: maxPDFSizeMegabytes,
             prettyPrint: false,
             verbose: verbose
         )
@@ -676,6 +725,7 @@ extension PDFDownloadConfiguration {
             timeout: timeouts.load,
             customHeaders: customHeaders,
             overwriteExistingFiles: overwritePDFs,
+            maximumSizeMegabytes: maxPDFSizeMegabytes,
             logger: logger
         )
     }
