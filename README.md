@@ -340,6 +340,16 @@ npm run puppeteer:bidi-p1
 
 This bridge controls WKWebView over WebSocket for scraping. It is not a fully compatible Chrome or Firefox WebDriver BiDi browser implementation. See [11. WebDriver BiDi Bridge](docs/11-webdriver-bidi-bridge.md) for details.
 
+#### Access control
+
+The bridge grants full control of the `WKWebView` — arbitrary JavaScript, cookies, navigation — to anyone who can open the WebSocket, so connections are filtered before the upgrade:
+
+- Requests carrying an `Origin` header are refused. WebSockets are exempt from the same-origin policy, so without this any page you visit while the server runs could connect to `ws://127.0.0.1:9222/session` and drive the browser. Non-browser clients such as `puppeteer-core` send no `Origin` and are unaffected.
+- The `Host` header must be an IP literal, `localhost`, or the configured `--bidi-host`, which blocks DNS rebinding.
+- `browsingContext.navigate` accepts only `http`, `https`, and `about` URLs, so a connected client cannot read local files through `file://`.
+
+There is no authentication beyond this. Binding to a non-loopback address with `--bidi-host` exposes the browser to everyone who can reach that port; do so only on a trusted network.
+
 ## Extraction modes
 | Mode | Description |
 | --- | --- |

@@ -5,3 +5,8 @@ out/
 .claude/
 .artifacts/
 /skills/swiftscraper/SKILL.md
+cookies*.json
+*.cookies.json
+.env
+.env.*
+downloads/

@@ -21,6 +21,7 @@ final class BiDiWebSocketServer: @unchecked Sendable {
     func start() throws {
         let hub = self.hub
         let dispatcher = self.dispatcher
+        let bindHost = self.host
 
         let bootstrap = ServerBootstrap(group: group)
             .serverChannelOption(ChannelOptions.backlog, value: 256)
@@ -28,7 +29,15 @@ final class BiDiWebSocketServer: @unchecked Sendable {
             .childChannelInitializer { channel in
                 let upgrader = NIOWebSocketServerUpgrader(
                     shouldUpgrade: { channel, requestHead in
-                        guard requestHead.uri == "/session" else {
+                        let allowed = BiDiAccessGuard.allowsUpgrade(
+                            uri: requestHead.uri,
+                            origin: requestHead.headers.first(name: "Origin"),
+                            host: requestHead.headers.first(name: "Host"),
+                            bindHost: bindHost
+                        )
+
+                        guard allowed else {
+                            channel.close(promise: nil)
                             return channel.eventLoop.makeSucceededFuture(nil)
                         }
 

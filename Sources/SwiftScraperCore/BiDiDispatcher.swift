@@ -97,6 +97,10 @@ final class BiDiDispatcher {
                     throw BiDiProtocolError.invalidArgument("url is required")
                 }
 
+                guard BiDiAccessGuard.allowsNavigation(to: url) else {
+                    throw BiDiProtocolError.invalidArgument("only http, https and about URLs can be navigated")
+                }
+
                 let wait = try parameterDecoder.navigationWait(from: params["wait"])
                 let navigationID = try await host.load(url: url, wait: wait)
                 return .success(

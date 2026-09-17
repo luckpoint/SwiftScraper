@@ -56,7 +56,7 @@ enum CookieJarStore {
         do {
             data = try encoder.encode(sortedDefinitions)
         } catch {
-            throw ScraperError.cookieJarFailed("JSON を生成できません: \(error.localizedDescription)")
+            throw ScraperError.cookieJarFailed("Unable to generate JSON: \(error.localizedDescription)")
         }
 
         do {
@@ -67,6 +67,10 @@ enum CookieJarStore {
                 attributes: nil
             )
             try data.write(to: fileURL, options: .atomic)
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: fileURL.path
+            )
         } catch {
             throw ScraperError.cookieJarFailed("\(fileURL.path): \(error.localizedDescription)")
         }

@@ -328,6 +328,32 @@ final class CLIParserTests: XCTestCase {
         XCTAssertEqual(try CookieJarStore.loadIfPresent(from: tempURL), definitions)
     }
 
+    func testCookieJarStoreSavesWithOwnerOnlyPermissions() throws {
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("json")
+
+        defer {
+            try? FileManager.default.removeItem(at: tempURL)
+        }
+
+        let definitions = [
+            CookieDefinition(
+                name: "session",
+                value: "secret",
+                domain: "example.com",
+                path: "/",
+                secure: true,
+                httpOnly: true
+            ),
+        ]
+
+        try CookieJarStore.save(definitions: definitions, to: tempURL)
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: tempURL.path)
+        XCTAssertEqual(attributes[.posixPermissions] as? NSNumber, NSNumber(value: 0o600))
+    }
+
     func testCookieDefinitionCanBeCreatedFromHTTPCookie() throws {
         let expires = Date(timeIntervalSince1970: 1_798_675_200)
         let definition = CookieDefinition(
