@@ -81,7 +81,7 @@ def load_result(path: Path) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise RuntimeError(f"結果JSONを読み込めません: {path}: {error}") from error
+        raise RuntimeError(f"cannot read result JSON: {path}: {error}") from error
 
 
 def output_directory(result: Any) -> Path | None:
@@ -112,7 +112,7 @@ def relative_destination(source: Path, output_root: Path | None, destination: Pa
 
 def ensure_safe_run_name(run_name: str) -> None:
     if not run_name or run_name in {".", ".."} or "/" in run_name or "\\" in run_name:
-        raise RuntimeError("--run-name は単一のフォルダ名を指定してください")
+        raise RuntimeError("--run-name must be a single folder name")
 
 
 def main() -> int:
@@ -126,7 +126,7 @@ def main() -> int:
         result = load_result(result_json)
         paths = unique_paths(iter_successful_paths(result))
         if not paths:
-            raise RuntimeError("成功したPDFが結果JSONにありません")
+            raise RuntimeError("result JSON contains no successful PDF downloads")
 
         output_root = output_directory(result)
         if output_root is not None:
@@ -135,26 +135,26 @@ def main() -> int:
             except ValueError:
                 pass
             else:
-                raise RuntimeError("同期先はダウンロード出力ディレクトリの外側に指定してください")
+                raise RuntimeError("destination root must be outside the download output directory")
 
         if destination.exists():
-            raise RuntimeError(f"移動先フォルダがすでに存在します: {destination}")
+            raise RuntimeError(f"destination folder already exists: {destination}")
 
         moves: list[tuple[Path, Path]] = []
         for source in paths:
             if not source.is_file():
-                raise RuntimeError(f"PDFファイルがありません: {source}")
+                raise RuntimeError(f"PDF file is missing: {source}")
             if source.suffix.lower() != ".pdf":
-                raise RuntimeError(f"PDF拡張子ではありません: {source}")
+                raise RuntimeError(f"not a .pdf file: {source}")
             if source.stat().st_size == 0:
-                raise RuntimeError(f"空のPDFファイルです: {source}")
+                raise RuntimeError(f"PDF file is empty: {source}")
             with source.open("rb") as handle:
                 if handle.read(5) != b"%PDF-":
-                    raise RuntimeError(f"PDFヘッダを確認できません: {source}")
+                    raise RuntimeError(f"missing %PDF- header: {source}")
 
             target = relative_destination(source, output_root, destination)
             if target.exists():
-                raise RuntimeError(f"移動先ファイルがすでに存在します: {target}")
+                raise RuntimeError(f"destination file already exists: {target}")
             moves.append((source, target))
 
         if not args.dry_run:
