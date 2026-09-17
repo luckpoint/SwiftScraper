@@ -35,6 +35,7 @@ Behavior
 - Files are MOVED, not copied; they no longer exist in the download directory.
 - Staged paths keep their layout relative to the run's `outputDirectory`.
 - `--run-name` must name a folder that does not exist yet.
+- Two sources that resolve to the same destination path abort the run.
 - A JSON summary goes to stdout. `--dry-run` prints it without touching files.
 """
 
@@ -141,6 +142,7 @@ def main() -> int:
             raise RuntimeError(f"destination folder already exists: {destination}")
 
         moves: list[tuple[Path, Path]] = []
+        planned: set[Path] = set()
         for source in paths:
             if not source.is_file():
                 raise RuntimeError(f"PDF file is missing: {source}")
@@ -155,6 +157,9 @@ def main() -> int:
             target = relative_destination(source, output_root, destination)
             if target.exists():
                 raise RuntimeError(f"destination file already exists: {target}")
+            if target in planned:
+                raise RuntimeError(f"two source files map to the same destination: {target}")
+            planned.add(target)
             moves.append((source, target))
 
         if not args.dry_run:
