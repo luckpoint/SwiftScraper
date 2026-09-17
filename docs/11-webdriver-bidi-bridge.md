@@ -18,26 +18,26 @@ SwiftNIO BiDi server
 The default endpoint is `ws://127.0.0.1:9222/session`.
 
 ```bash
-swift run swift-scraper -- \\
-  --bidi-server \\
+swift run swift-scraper -- \
+  --bidi-server \
   --verbose
 ```
 
 To change the bind host or port:
 
 ```bash
-swift run swift-scraper -- \\
-  --bidi-server \\
-  --bidi-host 127.0.0.1 \\
+swift run swift-scraper -- \
+  --bidi-server \
+  --bidi-host 127.0.0.1 \
   --bidi-port 9333
 ```
 
 To load an initial URL before accepting connections:
 
 ```bash
-swift run swift-scraper -- \\
-  --bidi-server \\
-  --url https://example.com \\
+swift run swift-scraper -- \
+  --bidi-server \
+  --url https://example.com \
   --visibility hidden-window
 ```
 
@@ -46,9 +46,9 @@ The minimal probe for checking a Puppeteer WebDriver BiDi connection is:
 
 ```bash
 npm install
-swift run swift-scraper -- \\
-  --bidi-server \\
-  --verbose \\
+swift run swift-scraper -- \
+  --bidi-server \
+  --verbose \
   --visibility hidden-window
 ```
 
@@ -79,14 +79,14 @@ The Yahoo! JAPAN probe opens `https://www.yahoo.co.jp/`, enters `Apple Swift` in
 To change the endpoint or query:
 
 ```bash
-SWIFTSCRAPER_BIDI_ENDPOINT=ws://127.0.0.1:9333/session \\
-GOOGLE_QUERY="Apple Swift" \\
+SWIFTSCRAPER_BIDI_ENDPOINT=ws://127.0.0.1:9333/session \
+GOOGLE_QUERY="Apple Swift" \
 npm run puppeteer:google
 ```
 
 ```bash
-SWIFTSCRAPER_BIDI_ENDPOINT=ws://127.0.0.1:9333/session \\
-YAHOO_QUERY="Apple Swift" \\
+SWIFTSCRAPER_BIDI_ENDPOINT=ws://127.0.0.1:9333/session \
+YAHOO_QUERY="Apple Swift" \
 npm run puppeteer:yahoo
 ```
 
@@ -97,10 +97,10 @@ To approximate Safari's User-Agent, specify a `User-Agent` header. In BiDi serve
 ```bash
 SAFARI_UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.3 Safari/605.1.15'
 
-swift run swift-scraper -- \\
-  --bidi-server \\
-  --verbose \\
-  --visibility visible-window \\
+swift run swift-scraper -- \
+  --bidi-server \
+  --verbose \
+  --visibility visible-window \
   --header "User-Agent: $SAFARI_UA"
 ```
 
@@ -119,10 +119,10 @@ swift run swift-scraper -- \\
 When checking `visible-window`, specify an initial URL so that the window shows page content instead of `about:blank`.
 
 ```bash
-swift run swift-scraper -- \\
-  --bidi-server \\
-  --verbose \\
-  --visibility visible-window \\
+swift run swift-scraper -- \
+  --bidi-server \
+  --verbose \
+  --visibility visible-window \
   --url https://www.yahoo.co.jp/
 ```
 

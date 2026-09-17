@@ -139,32 +139,32 @@ swift run swift-scraper -- https://example.com --output out/page.html
 
 ### 2. Convert likely content to Markdown
 ```bash
-swift run swift-scraper -- \\
-  https://example.com/article \\
-  --content-only \\
-  --markdown \\
+swift run swift-scraper -- \
+  https://example.com/article \
+  --content-only \
+  --markdown \
   --output out/article.md
 ```
 
 ### 3. Wait for rendering
 ```bash
-swift run swift-scraper -- \\
-  https://example.com/app \\
-  --auto-scroll \\
-  --wait-selector "#app" \\
-  --wait-text "Loaded" \\
-  --wait-timeout 20 \\
+swift run swift-scraper -- \
+  https://example.com/app \
+  --auto-scroll \
+  --wait-selector "#app" \
+  --wait-text "Loaded" \
+  --wait-timeout 20 \
   --dom-stable-delay 1.0
 ```
 
 ### 4. Keep only content images
 ```bash
-swift run swift-scraper -- \\
-  https://example.com/article \\
-  --content-only \\
-  --markdown \\
-  --extract-images \\
-  --image-filter article-only \\
+swift run swift-scraper -- \
+  https://example.com/article \
+  --content-only \
+  --markdown \
+  --extract-images \
+  --image-filter article-only \
   --image-debug
 ```
 
@@ -172,9 +172,9 @@ With `--extract-images`, image heuristics run before HTML or Markdown conversion
 
 ### 5. Save PDFs from a PDF index page
 ```bash
-swift run swift-scraper -- \\
-  https://www.okta.com/legal/trustandcompliance/ \\
-  --download-pdfs downloads \\
+swift run swift-scraper -- \
+  https://www.okta.com/legal/trustandcompliance/ \
+  --download-pdfs downloads \
   --auto-scroll
 ```
 
@@ -195,28 +195,28 @@ PDF files are downloaded with `URLSession`. Cookies are read from `WKWebsiteData
 `--download-pdfs` can be combined with `--sitemap` or `--url-file`. Each page is rendered, only its PDF links are saved, and the batch PDF download result JSON is written to stdout.
 
 ```bash
-swift run swift-scraper -- \\
-  https://example.com \\
-  --sitemap \\
-  --download-pdfs downloads \\
+swift run swift-scraper -- \
+  https://example.com \
+  --sitemap \
+  --download-pdfs downloads \
   --concurrency 4
 ```
 
 To keep the normal extraction result as well, use `--download-linked-pdfs <dir>`. Normal scrape output on stdout or at `--output` is preserved, and the PDF download result is saved to `<dir>/pdf-downloads.json`.
 
 ```bash
-swift run swift-scraper -- \\
-  https://example.com/docs \\
-  --content-only \\
-  --markdown \\
-  --download-linked-pdfs downloads \\
+swift run swift-scraper -- \
+  https://example.com/docs \
+  --content-only \
+  --markdown \
+  --download-linked-pdfs downloads \
   --output out/docs.md
 ```
 
 ### 6. Inject a cookie directly
 ```bash
-swift run swift-scraper -- \\
-  https://example.com/dashboard \\
+swift run swift-scraper -- \
+  https://example.com/dashboard \
   --cookie 'name=session;value=abc123;domain=example.com;path=/;secure=true;httpOnly=true'
 ```
 
@@ -235,8 +235,8 @@ swift run swift-scraper -- \\
 ```
 
 ```bash
-swift run swift-scraper -- \\
-  https://example.com/dashboard \\
+swift run swift-scraper -- \
+  https://example.com/dashboard \
   --cookie-file cookies.json
 ```
 
@@ -244,8 +244,8 @@ swift run swift-scraper -- \\
 If the file passed to `--cookie-jar` exists, cookies are injected before loading and the cookies remaining in WebKit's CookieStore are saved back to the same JSON file after execution. If the file does not exist, it is treated as an empty CookieJar and created after execution.
 
 ```bash
-swift run swift-scraper -- \\
-  https://example.com/dashboard \\
+swift run swift-scraper -- \
+  https://example.com/dashboard \
   --cookie-jar cookies.json
 ```
 
@@ -256,9 +256,9 @@ CookieJar uses the same format as `--cookie-file` and is written as a JSON array
 macOS 13 or later is supported with Chrome and Firefox. You may specify a profile name or profile directory path. If omitted, Chrome's `Default` profile or Firefox's default profile from `profiles.ini` is used.
 
 ```bash
-swift run swift-scraper -- \\
-  https://example.com/dashboard \\
-  --browser-cookies chrome \\
+swift run swift-scraper -- \
+  https://example.com/dashboard \
+  --browser-cookies chrome \
   --browser-profile "Profile 1"
 ```
 
@@ -268,9 +268,9 @@ Browser cookies are read once per command. For each batch page, the in-memory co
 
 ### 10. Send custom HTTP headers
 ```bash
-swift run swift-scraper -- \\
-  https://example.com/docs \\
-  --header 'Accept-Language: en,en-US;q=0.9' \\
+swift run swift-scraper -- \
+  https://example.com/docs \
+  --header 'Accept-Language: en,en-US;q=0.9' \
   --header 'X-Custom-Header: value'
 ```
 
@@ -278,12 +278,12 @@ Use this to force an English version with `Accept-Language` on sites that redire
 
 ### 11. Run a batch from a sitemap
 ```bash
-swift run swift-scraper -- \\
-  https://example.com \\
-  --sitemap \\
-  --content-only \\
-  --markdown \\
-  --concurrency 8 \\
+swift run swift-scraper -- \
+  https://example.com \
+  --sitemap \
+  --content-only \
+  --markdown \
+  --concurrency 8 \
   --output out/sitemap-batch.json
 ```
 
@@ -298,10 +298,10 @@ https://example.com/three
 ```
 
 ```bash
-swift run swift-scraper -- \\
-  --url-file urls.txt \\
-  --inspect-structure \\
-  --concurrency 3 \\
+swift run swift-scraper -- \
+  --url-file urls.txt \
+  --inspect-structure \
+  --concurrency 3 \
   --output out/url-file-batch.json
 ```
 
@@ -309,18 +309,18 @@ swift run swift-scraper -- \\
 `--bidi-server` starts a SwiftNIO WebSocket server so external programs can control the `WKWebView` in the same process with JSON commands. The endpoint is `ws://127.0.0.1:9222/session`.
 
 ```bash
-swift run swift-scraper -- \\
-  --bidi-server \\
-  --bidi-port 9222 \\
+swift run swift-scraper -- \
+  --bidi-server \
+  --bidi-port 9222 \
   --verbose
 ```
 
 To specify an initial URL:
 
 ```bash
-swift run swift-scraper -- \\
-  --bidi-server \\
-  --url https://example.com \\
+swift run swift-scraper -- \
+  --bidi-server \
+  --url https://example.com \
   --visibility hidden-window
 ```
 

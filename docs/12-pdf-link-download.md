@@ -14,41 +14,41 @@ There are two modes: a dedicated mode that saves only PDFs, and a sidecar mode t
 Save PDFs from a single PDF index page:
 
 ```bash
-swift run swift-scraper -- \\
-  https://www.okta.com/legal/trustandcompliance/ \\
-  --download-pdfs downloads \\
+swift run swift-scraper -- \
+  https://www.okta.com/legal/trustandcompliance/ \
+  --download-pdfs downloads \
   --auto-scroll
 ```
 
 Traverse multiple pages from a sitemap and save only their PDFs:
 
 ```bash
-swift run swift-scraper -- \\
-  https://example.com \\
-  --sitemap \\
-  --download-pdfs downloads \\
+swift run swift-scraper -- \
+  https://example.com \
+  --sitemap \
+  --download-pdfs downloads \
   --concurrency 4
 ```
 
 Save PDFs alongside a normal scrape:
 
 ```bash
-swift run swift-scraper -- \\
-  https://example.com/docs \\
-  --content-only \\
-  --markdown \\
-  --download-linked-pdfs downloads \\
+swift run swift-scraper -- \
+  https://example.com/docs \
+  --content-only \
+  --markdown \
+  --download-linked-pdfs downloads \
   --output out/docs.md
 ```
 
 Save PDFs alongside a batch scrape from a URL file:
 
 ```bash
-swift run swift-scraper -- \\
-  --url-file urls.txt \\
-  --content-only \\
-  --markdown \\
-  --download-linked-pdfs downloads \\
+swift run swift-scraper -- \
+  --url-file urls.txt \
+  --content-only \
+  --markdown \
+  --download-linked-pdfs downloads \
   --output out/pages.json
 ```
 
