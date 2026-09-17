@@ -429,20 +429,22 @@ final class BiDiWebViewHost: NSObject {
         let configuration = WKSnapshotConfiguration()
         configuration.rect = webView.bounds
 
-        let image = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<NSImage, Error>) in
+        let pngData = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
             webView.takeSnapshot(with: configuration) { image, error in
                 if let error {
                     continuation.resume(throwing: ScraperError.extractionFailed(error.localizedDescription))
                 } else if let image {
-                    continuation.resume(returning: image)
+                    if let pngData = image.pngData {
+                        continuation.resume(returning: pngData)
+                    } else {
+                        continuation.resume(
+                            throwing: ScraperError.extractionFailed("WKWebView snapshot could not be encoded as PNG")
+                        )
+                    }
                 } else {
                     continuation.resume(throwing: ScraperError.extractionFailed("WKWebView snapshot returned no image"))
                 }
             }
-        }
-
-        guard let pngData = image.pngData else {
-            throw ScraperError.extractionFailed("WKWebView snapshot could not be encoded as PNG")
         }
 
         return pngData.base64EncodedString()
