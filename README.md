@@ -61,6 +61,24 @@ Set `BIN_DIR` to change the installation directory:
 BIN_DIR="$HOME/bin" ./scripts/install.sh
 ```
 
+### Security checks
+Install the local scanners with Homebrew:
+
+```bash
+brew install gitleaks osv-scanner
+```
+
+Run both checks before publishing changes:
+
+```bash
+./scripts/security-scan.sh
+```
+
+GitHub Actions runs the same checks on pull requests and pushes to `main`, and
+also runs a scheduled dependency scan. Gitleaks scans the repository history;
+OSV-Scanner scans supported dependency manifests, including `Package.resolved`
+and `package-lock.json`.
+
 ## Usage
 ### Basic
 ```bash
