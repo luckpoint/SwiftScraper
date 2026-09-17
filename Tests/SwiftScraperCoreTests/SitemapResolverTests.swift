@@ -86,4 +86,35 @@ final class SitemapResolverTests: XCTestCase {
             XCTAssertTrue(message.contains("A loc could not be interpreted as a URL"))
         }
     }
+
+    func testResolveRejectsDocumentAboveSizeLimit() async throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SwiftScraperTests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: directoryURL)
+        }
+
+        let sitemapURL = directoryURL.appendingPathComponent("sitemap.xml")
+        let oversized = Data(repeating: 0x20, count: SitemapResolver.maximumDocumentBytes + 1)
+        try oversized.write(to: sitemapURL)
+
+        let resolver = SitemapResolver(timeout: 1, logger: StderrLogger(verbose: false))
+
+        do {
+            _ = try await resolver.resolve(startingFrom: sitemapURL)
+            XCTFail("sitemapFetchFailed expected")
+        } catch let error as ScraperError {
+            guard case .sitemapFetchFailed(let message) = error else {
+                return XCTFail("sitemapFetchFailed expected, got \(error)")
+            }
+
+            XCTAssertTrue(message.contains("above the \(SitemapResolver.maximumDocumentBytes) byte limit"), message)
+        }
+    }
+
+    func testSizeLimitMatchesSitemapProtocol() {
+        XCTAssertEqual(SitemapResolver.maximumDocumentBytes, 52_428_800)
+    }
 }

@@ -11,6 +11,9 @@ enum SitemapDocument: Equatable {
 }
 
 struct SitemapResolver: Sendable {
+    /// The sitemaps.org protocol caps an uncompressed sitemap at 50MB.
+    static let maximumDocumentBytes = 50 * 1_048_576
+
     let timeout: TimeInterval
     let logger: StderrLogger
 
@@ -93,7 +96,9 @@ struct SitemapResolver: Sendable {
     private func loadData(from url: URL) async throws -> Data {
         if url.isFileURL {
             do {
-                return try Data(contentsOf: url)
+                return try validatedSize(of: try Data(contentsOf: url), from: url)
+            } catch let error as ScraperError {
+                throw error
             } catch {
                 throw ScraperError.sitemapFetchFailed("\(url.path): \(error.localizedDescription)")
             }
@@ -110,12 +115,22 @@ struct SitemapResolver: Sendable {
                 throw ScraperError.sitemapFetchFailed("\(url.absoluteString): HTTP \(httpResponse.statusCode)")
             }
 
-            return data
+            return try validatedSize(of: data, from: url)
         } catch let error as ScraperError {
             throw error
         } catch {
             throw ScraperError.sitemapFetchFailed("\(url.absoluteString): \(error.localizedDescription)")
         }
+    }
+
+    private func validatedSize(of data: Data, from url: URL) throws -> Data {
+        guard data.count <= Self.maximumDocumentBytes else {
+            throw ScraperError.sitemapFetchFailed(
+                "\(url.absoluteString): \(data.count) bytes, above the \(Self.maximumDocumentBytes) byte limit"
+            )
+        }
+
+        return data
     }
 }
 
