@@ -188,6 +188,8 @@ PDF link discovery happens in the rendered WKWebView DOM through `document.query
 
 PDF bytes are downloaded with `URLSession`. SwiftScraper propagates the WKWebView `navigator.userAgent` unless an explicit `User-Agent` header was provided, and propagates matching cookies from `WKWebsiteDataStore.httpCookieStore` unless an explicit `Cookie` header was provided.
 
+For a post-processing example that verifies downloaded PDFs and stages them into a sync folder, see `scripts/stage_verified_pdfs.py`.
+
 Known limits:
 
 - `.pdf` path links only; download endpoints that return PDFs without a `.pdf` path are future candidates, not implemented.

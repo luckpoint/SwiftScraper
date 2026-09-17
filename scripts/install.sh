@@ -13,7 +13,7 @@ BUILD_BINARY="${PROJECT_DIR}/.build/${BUILD_CONFIGURATION}/${BINARY_NAME}"
 INSTALL_BINARY="${BIN_DIR}/${BINARY_NAME}"
 
 if ! command -v swift >/dev/null 2>&1; then
-  echo "error: Swift が見つかりません。Swift 6.0 以降をインストールしてください。" >&2
+  echo "error: Swift not found. Install Swift 6.0 or later." >&2
   exit 1
 fi
 
@@ -24,7 +24,7 @@ echo "Building ${BINARY_NAME} (${BUILD_CONFIGURATION})..."
 )
 
 if [[ ! -x "${BUILD_BINARY}" ]]; then
-  echo "error: ビルド成果物が見つかりません: ${BUILD_BINARY}" >&2
+  echo "error: build artifact not found: ${BUILD_BINARY}" >&2
   exit 1
 fi
 

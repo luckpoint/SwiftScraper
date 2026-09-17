@@ -23,7 +23,7 @@ Prerequisites
 
 Usage
 -----
-    python3 stage_verified_pdfs.py result.json ~/GoogleDrive/NotebookLM \
+    python3 scripts/stage_verified_pdfs.py result.json ~/GoogleDrive/NotebookLM \
         --run-name okta-2026-09 [--dry-run]
 
 Behavior
