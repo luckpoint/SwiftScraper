@@ -13,13 +13,15 @@ It handles dynamic pages that a simple `URLSession` fetch cannot fully retrieve,
 - Pretty-print HTML and convert HTML to Markdown
 - Collect image features with JavaScript and use Swift heuristics to remove logos and UI images
 - Run batches from `sitemap.xml` or a URL file
-- Extract `.pdf` links from PDF index pages and save them in site-specific directories
+- Extract `.pdf` links from PDF index pages and save them in site-specific directories, rejecting responses that are not PDFs
+- Convert a Markdown file to PDF with `--pdf`
 - Start a WebDriver BiDi-style bridge over a SwiftNIO WebSocket server to control WKWebView
 - Select the level of exposure with `windowless`, `hidden-window`, or `visible-window`
 
 ## Requirements
 - macOS 13 or later
 - Swift 6.0
+- Node.js 18 or later, only for the `npm run puppeteer:*` probe scripts
 
 Because it uses `WKWebView` and AppKit, SwiftScraper runs only on macOS.
 The design aims to minimize user exposure rather than provide a fully headless browser.
@@ -42,7 +44,7 @@ Generated binary:
 ```
 
 ### Installation
-Install with Homebrew (macOS Sequoia or later, with Xcode or the Command Line Tools):
+Install with Homebrew (macOS 13 or later, with Xcode or the Command Line Tools):
 
 ```bash
 brew tap luckpoint/swift-scraper
@@ -89,15 +91,16 @@ When invoked through `swift run`, include `--` before the CLI options.
 
 ### Main options
 ```text
---bidi-server                 Start the WKWebView BiDi bridge server
---bidi-host <host>            BiDi server bind host; defaults to 127.0.0.1
---bidi-port <port>            BiDi server bind port; defaults to 9222
---cookie <spec>               Add one cookie
---cookie-file <path>          Load cookies from JSON
---cookie-jar <path>           Load CookieJar JSON and save it after execution
---browser-cookies <browser>   Load cookies from macOS Chrome or Firefox
---browser-profile <name|path> Browser profile name or path
---header <Name: Value>        Add an HTTP header; may be specified multiple times
+--bidi-server                  Start the WKWebView BiDi bridge server
+--bidi-host <host>             BiDi server bind host; defaults to 127.0.0.1
+--bidi-port <port>             BiDi server bind port; defaults to 9222
+--url <url>                    Set the target URL explicitly
+--cookie <spec>                Add one cookie
+--cookie-file <path>           Load cookies from JSON
+--cookie-jar <path>            Load CookieJar JSON and save it after execution
+--browser-cookies <browser>    Load cookies from macOS Chrome or Firefox
+--browser-profile <name|path>  Browser profile name or path; defaults to the default profile
+--header <Name: Value>         Add an HTTP header; may be specified multiple times
 --persistent-store             Use a persistent DataStore
 --visibility <mode>            windowless | hidden-window | visible-window
 --viewport <width>x<height>    WebView size; defaults to 1440x900
@@ -109,26 +112,30 @@ When invoked through `swift run`, include `--` before the CLI options.
 --dom-stable-delay <seconds>   Time before the DOM is considered stable; defaults to 0.5
 --load-timeout <seconds>       Load-stage timeout; defaults to 30
 --wait-timeout <seconds>       Rendering wait timeout; defaults to 15
---js-timeout <seconds>         JavaScript execution timeout; defaults to 10
+--js-timeout <seconds>         evaluateJavaScript timeout; defaults to 10
+--sitemap                      Follow the target site's sitemap.xml for multiple URLs
+--url-file <path>              Read one URL per line from a file
+--concurrency <count>          Batch concurrency; defaults to 4
+--output <path>                Save to a file instead of standard output
 --download-pdfs <directory>    Save PDF links found on the page
 --download-linked-pdfs <dir>   Save PDF links alongside normal extraction
 --overwrite-pdfs               Replace existing PDFs instead of avoiding name collisions
---output <path>                Save to a file instead of standard output
+--max-pdf-size <megabytes>     Reject PDFs above this size before writing; defaults to 100 (1 MB = 1048576 bytes)
 --body-text                    Extract document.body.innerText
 --selector-inner-html <css>    Extract innerHTML from selected elements
---content-only                 Extract the likely content HTML
---inspect-structure            Inspect content candidates and landmark information
+--content-only                 Extract content HTML without header, footer or sidebar
+--inspect-structure            Inspect page structure and content candidates without dumping HTML
 --markdown                     Convert HTML extraction results to Markdown
---extract-images               Apply image heuristics to HTML output
+--extract-images               Apply image heuristics to narrow images in HTML output
 --image-filter <mode>          all | article-only
 --image-score-threshold <0-1>  Keep threshold; defaults to 0.65
 --image-include-maybe          Keep images classified as maybe
 --image-debug                  Write image scores and reasons as JSON to stderr
---pretty-print                 Format HTML output
+--pretty-print                 Format HTML output with SwiftSoup
+--pdf <file.md>                Convert a Markdown file to PDF
 --verbose                      Write progress logs to stderr
---sitemap                      Follow sitemap.xml for batch execution
---url-file <path>              Use a URL list file for batch execution
---concurrency <count>          Batch concurrency; defaults to 4
+--version                      Show the version
+--help                         Show this help
 ```
 
 ## Examples
@@ -353,6 +360,7 @@ Main supported methods:
 To verify P0/P1 and the SwiftScraper scraping extension without depending on external sites:
 
 ```bash
+npm install
 npm run puppeteer:bidi-p1
 ```
 
@@ -447,6 +455,11 @@ On failure:
 - [10. PDF Generation](docs/10-pdf-generation.md)
 - [11. WebDriver BiDi Bridge](docs/11-webdriver-bidi-bridge.md)
 - [12. PDF Link Download](docs/12-pdf-link-download.md)
+
+### Planning documents
+These describe intended direction, not shipped behavior. Command examples in them may use options that do not exist yet.
+
+- [00. Initial Design](docs/00-initial-design.md)
 - [13. Knowledge Base Improvement Roadmap](docs/13-knowledge-base-roadmap.md)
 - [14. Search Result Discovery](docs/14-search-discovery.md)
 - [15. Knowledge Base Source Artifact Specification](docs/15-kb-source-spec.md)

@@ -4,7 +4,6 @@ out/
 .DS_Store
 .claude/
 .artifacts/
-/skills/swiftscraper/SKILL.md
 cookies*.json
 *.cookies.json
 .env

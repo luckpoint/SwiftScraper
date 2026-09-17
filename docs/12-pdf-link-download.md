@@ -72,6 +72,7 @@ The following page-loading options are shared:
 - `--viewport`
 - `--persistent-store`
 - `--overwrite-pdfs`
+- `--max-pdf-size`
 
 `--download-pdfs` can be combined with `--sitemap`, `--url-file`, and `--concurrency`. `--concurrency` is effective only when used with batch input.
 
@@ -107,6 +108,21 @@ File names are generated as follows:
 
 With `--overwrite-pdfs`, replace an existing file with the same name instead of adding a suffix. If multiple PDF links produce the same name during one run, the second and later links still receive suffixes even with overwrite enabled.
 
+## Response validation
+
+A downloaded response is checked before it is written to disk:
+
+- It must begin with the `%PDF-` header. A site that answers `200 OK` with an HTML error page for a `.pdf` URL is rejected instead of being saved under a `.pdf` name.
+- It must not exceed `--max-pdf-size`, which defaults to 100 megabytes, where 1 megabyte is 1048576 bytes.
+
+The header is checked first, so an oversized HTML page is reported as not being a PDF rather than as being too large.
+
+A rejected link fails on its own. The run continues, the manifest records `success: false` with the reason, and the process still exits with status 1 because the failure count is non-zero. Because the manifest fills in `outputPath` for failures as well, read `success` rather than the presence of a path.
+
+The size limit rejects a response before it is written to disk; it does not stop it from being downloaded. `URLSession` buffers the whole body in memory before the check runs.
+
+Links with a `file://` URL are copied without validation, since they name a file the caller chose.
+
 Examples:
 
 ```text
@@ -123,7 +139,7 @@ report-2.pdf
 5. Remove URL fragments and duplicate URLs
 6. Read the actual WKWebView user agent from `navigator.userAgent`
 7. Apply cookies remaining in WebKit's CookieStore to PDF download requests
-8. Download PDFs with `URLSession` and save them under the source page's directory
+8. Download PDFs with `URLSession`, reject responses that fail validation, and save the rest under the source page's directory
 9. `--download-pdfs` writes JSON to stdout; `--download-linked-pdfs` saves a manifest at `<dir>/pdf-downloads.json`
 
 `--download-linked-pdfs` does not load the page twice. It collects PDF links during the same `WKWebView` execution as normal extraction and saves the PDFs afterward.

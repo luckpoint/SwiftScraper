@@ -1,6 +1,6 @@
 ---
 name: swiftscraper
-description: Use this skill whenever Codex needs to work with SwiftScraper, a macOS WKWebView-based Swift CLI and WebDriver BiDi-style scraping bridge. Covers CLI scraping, rendering waits, cookies and headers, batch scraping from sitemap or URL files, Markdown and image extraction, linked PDF downloads with `--download-pdfs` and `--download-linked-pdfs`, PDF generation from Markdown, BiDi server operation, Puppeteer/raw WebSocket clients, and troubleshooting SwiftScraper behavior.
+description: Use this skill when working with SwiftScraper, a macOS WKWebView-based Swift CLI and WebDriver BiDi-style scraping bridge. Covers CLI scraping, rendering waits, cookies and headers, batch scraping from sitemap or URL files, Markdown and image extraction, linked PDF downloads with `--download-pdfs` and `--download-linked-pdfs`, PDF generation from Markdown, BiDi server operation, Puppeteer/raw WebSocket clients, and troubleshooting SwiftScraper behavior.
 ---
 
 # SwiftScraper
