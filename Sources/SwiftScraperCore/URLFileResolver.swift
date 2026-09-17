@@ -24,7 +24,7 @@ enum URLFileResolver {
             }
 
             guard let url = URL(string: trimmed), let scheme = url.scheme, !scheme.isEmpty else {
-                throw ScraperError.urlFileFailed("\(fileURL.path): \(index + 1) 行目が URL として不正です: \(trimmed)")
+                throw ScraperError.urlFileFailed("\(fileURL.path): line \(index + 1) is not a valid URL: \(trimmed)")
             }
 
             let normalized = url.absoluteURL
@@ -35,7 +35,7 @@ enum URLFileResolver {
         }
 
         guard !pageURLs.isEmpty else {
-            throw ScraperError.urlFileFailed("\(fileURL.path): URL が 1 件も見つかりませんでした")
+            throw ScraperError.urlFileFailed("\(fileURL.path): No URLs found")
         }
 
         return ResolvedURLFile(fileURL: fileURL, pageURLs: pageURLs)

@@ -45,7 +45,7 @@ enum BatchRunFormatter {
             let data = try encoder.encode(result)
             return String(decoding: data, as: UTF8.self)
         } catch {
-            throw ScraperError.outputFailed("batch JSON を生成できません: \(error.localizedDescription)")
+            throw ScraperError.outputFailed("Unable to generate the batch JSON: \(error.localizedDescription)")
         }
     }
 }

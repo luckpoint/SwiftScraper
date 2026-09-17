@@ -48,7 +48,7 @@ enum OutputFormatter {
     ) throws -> String {
         switch extraction {
         case .bodyText, .structureInspection:
-            throw ScraperError.markdownFailed("この抽出モードでは Markdown に変換できません")
+            throw ScraperError.markdownFailed("This extraction mode cannot be converted to Markdown")
         case .outerHTML, .selectorInnerHTML, .contentOnly:
             do {
                 return try HTMLToMarkdown.convert(

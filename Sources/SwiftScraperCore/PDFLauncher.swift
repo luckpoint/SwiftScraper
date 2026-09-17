@@ -38,17 +38,17 @@ public final class PDFLauncher {
 
     private func executePDFConversion() throws {
         let markdownString = try readMarkdownFile(configuration.inputFile)
-        logger.info("読み込み完了: \(configuration.inputFile.path)")
+        logger.info("Loaded: \(configuration.inputFile.path)")
 
         let html = MarkdownHTMLConverter.convert(markdown: markdownString)
-        logger.info("HTML 変換完了")
+        logger.info("HTML conversion finished")
 
         let outputDir = configuration.outputFile.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
         let renderer = PDFRenderer(logger: logger)
         try renderer.render(html: html, outputURL: configuration.outputFile)
-        logger.info("保存完了: \(configuration.outputFile.path)", force: true)
+        logger.info("Saved: \(configuration.outputFile.path)", force: true)
     }
 
     private func readMarkdownFile(_ url: URL) throws -> String {

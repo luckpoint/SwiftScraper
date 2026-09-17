@@ -175,7 +175,7 @@ enum PDFDownloadFormatter {
             let data = try encoder.encode(result)
             return String(decoding: data, as: UTF8.self)
         } catch {
-            throw ScraperError.outputFailed("PDF ダウンロード JSON を生成できません: \(error.localizedDescription)")
+            throw ScraperError.outputFailed("Unable to generate the PDF download JSON: \(error.localizedDescription)")
         }
     }
 }
@@ -348,7 +348,7 @@ struct PDFDownloadSaver {
             throw ScraperError.pdfDownloadFailed("\(sourceDirectory.path): \(error.localizedDescription)")
         }
 
-        logger.info("PDF 保存先: \(sourceDirectory.path)")
+        logger.info("PDF output directory: \(sourceDirectory.path)")
 
         var usedFileNames: Set<String> = []
         var files: [PDFDownloadRunResult.File] = []
@@ -373,7 +373,7 @@ struct PDFDownloadSaver {
                     cookies: collection.cookies,
                     userAgent: collection.userAgent
                 )
-                logger.info("PDF 保存完了: \(outputURL.path)")
+                logger.info("PDF saved: \(outputURL.path)")
                 files.append(.succeeded(link: link, originalFilename: originalFilename, outputURL: outputURL))
             } catch {
                 logger.error("\(link.url.absoluteString): \(error.localizedDescription)")
@@ -538,7 +538,7 @@ public final class PDFDownloadLauncher {
 
     private func makeBatchRunResult(_ batchMode: BatchMode) async throws -> PDFDownloadBatchRunResult {
         let resolved = try await resolveBatchSource(batchMode)
-        logger.info("\(resolved.kind) から \(resolved.pageURLs.count) 件の URL を解決しました")
+        logger.info("Resolved \(resolved.pageURLs.count) URLs from \(resolved.kind)")
 
         let concurrency = min(batchMode.concurrency, max(resolved.pageURLs.count, 1))
         let limiter = AsyncSemaphore(limit: concurrency)

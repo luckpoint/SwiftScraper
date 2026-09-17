@@ -174,7 +174,7 @@ public struct CookieDefinition: Codable, Equatable, Sendable {
 
         guard let cookie = HTTPCookie(properties: properties) else {
             throw ScraperError.invalidCookieSpec(
-                "HTTPCookie を生成できませんでした: name=\(name), domain=\(domain), path=\(path)"
+                "Unable to create HTTPCookie: name=\(name), domain=\(domain), path=\(path)"
             )
         }
 
@@ -404,47 +404,47 @@ public enum ScraperError: LocalizedError, Equatable, Sendable {
         case .invalidArgument(let message):
             return message
         case .unknownOption(let option):
-            return "未知のオプションです: \(option)"
+            return "Unknown option: \(option)"
         case .invalidURL(let raw):
-            return "URL として解釈できません: \(raw)"
+            return "Cannot be interpreted as a URL: \(raw)"
         case .missingOptionValue(let option):
-            return "オプションの値が不足しています: \(option)"
+            return "Missing value for option: \(option)"
         case .invalidCookieSpec(let message):
-            return "Cookie 指定が不正です: \(message)"
+            return "Invalid cookie spec: \(message)"
         case .invalidCookieFile(let message):
-            return "Cookie ファイルを読み込めません: \(message)"
+            return "Unable to read the cookie file: \(message)"
         case .browserCookieFailed(let message):
-            return "ブラウザ Cookie を読み込めません: \(message)"
+            return "Unable to read browser cookies: \(message)"
         case .cookieJarFailed(let message):
-            return "CookieJar を扱えません: \(message)"
+            return "Unable to handle the CookieJar: \(message)"
         case .loadFailed(let message):
-            return "ページロードに失敗しました: \(message)"
+            return "Page load failed: \(message)"
         case .timedOut(let phase, let timeout):
-            return "\(phase) が \(timeout)s でタイムアウトしました"
+            return "\(phase) timed out after \(timeout)s"
         case .javaScriptFailed(let message):
-            return "JavaScript 実行に失敗しました: \(message)"
+            return "JavaScript execution failed: \(message)"
         case .unexpectedJavaScriptResult(let phase, let expected):
-            return "\(phase) の戻り値が想定外です。期待型: \(expected)"
+            return "\(phase) returned an unexpected value; expected \(expected)"
         case .extractionFailed(let message):
-            return "抽出に失敗しました: \(message)"
+            return "Extraction failed: \(message)"
         case .sitemapFetchFailed(let message):
-            return "sitemap を取得できません: \(message)"
+            return "Unable to fetch the sitemap: \(message)"
         case .sitemapParseFailed(let message):
-            return "sitemap を解釈できません: \(message)"
+            return "Unable to parse the sitemap: \(message)"
         case .urlFileFailed(let message):
-            return "URL リストファイルを読み込めません: \(message)"
+            return "Unable to read the URL list file: \(message)"
         case .markdownFailed(let message):
-            return "Markdown 変換に失敗しました: \(message)"
+            return "Markdown conversion failed: \(message)"
         case .prettyPrintFailed(let message):
-            return "整形に失敗しました: \(message)"
+            return "Formatting failed: \(message)"
         case .outputFailed(let message):
-            return "出力に失敗しました: \(message)"
+            return "Output failed: \(message)"
         case .pdfInputNotFound(let message):
-            return "入力ファイルが見つかりません: \(message)"
+            return "Input file not found: \(message)"
         case .pdfRenderFailed(let message):
-            return "PDF 生成に失敗しました: \(message)"
+            return "PDF generation failed: \(message)"
         case .pdfDownloadFailed(let message):
-            return "PDF ダウンロードに失敗しました: \(message)"
+            return "PDF download failed: \(message)"
         }
     }
 }

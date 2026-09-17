@@ -61,7 +61,7 @@ public final class WebScraper: NSObject {
     }
 
     private func runWithOptionalPDFLinks(collectPDFLinks: Bool) async throws -> WebScraperRunResult {
-        logger.info("開始 URL: \(configuration.url.absoluteString)")
+        logger.info("Start URL: \(configuration.url.absoluteString)")
         logger.info("DataStore: \(configuration.dataStoreMode.rawValue), visibility: \(configuration.visibility.rawValue)")
 
         defer {
@@ -91,7 +91,7 @@ public final class WebScraper: NSObject {
     }
 
     public func collectPDFLinks() async throws -> PDFLinkCollection {
-        logger.info("開始 URL: \(configuration.url.absoluteString)")
+        logger.info("Start URL: \(configuration.url.absoluteString)")
         logger.info("DataStore: \(configuration.dataStoreMode.rawValue), visibility: \(configuration.visibility.rawValue)")
 
         defer {
@@ -120,26 +120,26 @@ public final class WebScraper: NSObject {
         let cookies = allCookies.filter { $0.matches(url: configuration.url) }
 
         guard !allCookies.isEmpty else {
-            logger.info("Cookie 注入はありません")
+            logger.info("No cookies to inject")
             return
         }
 
         guard !cookies.isEmpty else {
-            logger.info("対象 URL に一致する Cookie はありません")
+            logger.info("No cookies match the target URL")
             return
         }
 
-        logger.info("Cookie を \(cookies.count) 件注入します")
+        logger.info("Injecting \(cookies.count) cookies")
 
         for cookie in cookies {
             let httpCookie = try cookie.makeHTTPCookie()
             await store.setCookieAsync(httpCookie)
-            logger.info("Cookie 注入完了: \(cookie.name) @ \(cookie.domain)")
+            logger.info("Cookie injected: \(cookie.name) @ \(cookie.domain)")
         }
 
         if configuration.verbose {
             let injected = await store.allCookies()
-            logger.info("CookieStore 件数: \(injected.count)")
+            logger.info("CookieStore count: \(injected.count)")
         }
     }
 
@@ -149,7 +149,7 @@ public final class WebScraper: NSObject {
         }
 
         let cookies = try CookieJarStore.loadIfPresent(from: cookieJar)
-        logger.info("CookieJar を \(cookies.count) 件読み込みました: \(cookieJar.path)")
+        logger.info("Loaded \(cookies.count) cookies from the CookieJar: \(cookieJar.path)")
         return cookies
     }
 
@@ -161,7 +161,7 @@ public final class WebScraper: NSObject {
         let store = webView.configuration.websiteDataStore.httpCookieStore
         let cookies = await store.allCookies()
         try CookieJarStore.save(cookies: cookies, to: cookieJar)
-        logger.info("CookieJar を \(cookies.count) 件保存しました: \(cookieJar.path)")
+        logger.info("Saved \(cookies.count) cookies to the CookieJar: \(cookieJar.path)")
     }
 
     private func currentCookieDefinitions() async -> [CookieDefinition] {
@@ -178,19 +178,19 @@ public final class WebScraper: NSObject {
     }
 
     private func loadPage() async throws {
-        logger.info("ページロードを開始します")
+        logger.info("Starting page load")
 
         let result = await withCheckedContinuation { (continuation: CheckedContinuation<Result<Void, ScraperError>, Never>) in
             navigationContinuation = continuation
             navigationTimeoutTask = timeoutTask(
                 seconds: configuration.timeouts.load,
-                error: .timedOut(phase: "ページロード", timeout: configuration.timeouts.load)
+                error: .timedOut(phase: "page load", timeout: configuration.timeouts.load)
             ) { [weak self] in
                 self?.webView.stopLoading()
                 self?.completeNavigation(
                     with: .failure(
                         ScraperError.timedOut(
-                            phase: "ページロード",
+                            phase: "page load",
                             timeout: self?.configuration.timeouts.load ?? 0
                         )
                     )
@@ -212,43 +212,43 @@ public final class WebScraper: NSObject {
             throw error
         }
 
-        logger.info("ページロード完了")
+        logger.info("Page load finished")
     }
 
     private func waitForRenderIfNeeded() async throws {
         let deadline = Date().addingTimeInterval(configuration.timeouts.render)
 
         if configuration.wait.fixedDelay > 0 {
-            logger.info("固定待機: \(configuration.wait.fixedDelay)s")
+            logger.info("Fixed wait: \(configuration.wait.fixedDelay)s")
             try await sleepUntilDeadlineOrThrow(
                 requested: configuration.wait.fixedDelay,
                 deadline: deadline,
-                phase: "描画待機"
+                phase: "render wait"
             )
         }
 
         if configuration.wait.autoScrollEnabled {
             try await autoScrollToBottom(until: deadline)
         } else {
-            logger.info("自動スクロールは無効です")
+            logger.info("Auto scroll is disabled")
         }
 
         if configuration.wait.selectorConditions.isEmpty && configuration.wait.textConditions.isEmpty {
-            logger.info("追加の描画待機条件はありません")
+            logger.info("No additional render wait conditions")
         } else {
-            logger.info("描画待機を開始します")
+            logger.info("Starting render wait")
             try await waitForExplicitRenderConditions(until: deadline)
         }
 
         if configuration.wait.domStableDelay > 0 {
             try await waitForDOMStability(until: deadline)
         } else {
-            logger.info("DOM 安定待機は無効です")
+            logger.info("DOM stability wait is disabled")
         }
     }
 
     private func autoScrollToBottom(until deadline: Date) async throws {
-        logger.info("自動スクロールを開始します")
+        logger.info("Starting auto scroll")
 
         var previousScrollHeight = -1.0
         var stableBottomCount = 0
@@ -270,11 +270,11 @@ public final class WebScraper: NSObject {
                 }
 
                 if stableBottomCount >= 1 {
-                    logger.info("自動スクロールが完了しました")
+                    logger.info("Auto scroll finished")
                     try await sleepUntilDeadlineOrThrow(
                         requested: configuration.wait.pollInterval,
                         deadline: deadline,
-                        phase: "描画待機"
+                        phase: "render wait"
                     )
                     return
                 }
@@ -287,7 +287,7 @@ public final class WebScraper: NSObject {
             try await sleepUntilDeadlineOrThrow(
                 requested: configuration.wait.pollInterval,
                 deadline: deadline,
-                phase: "描画待機"
+                phase: "render wait"
             )
         }
     }
@@ -296,7 +296,7 @@ public final class WebScraper: NSObject {
         while true {
             let probe = try await evaluateWaitConditions()
             if probe.ready {
-                logger.info("描画待機条件を満たしました")
+                logger.info("Render wait conditions satisfied")
                 return
             }
 
@@ -305,38 +305,38 @@ public final class WebScraper: NSObject {
                 let textFailures = probe.texts.filter { !$0.matched }.map(\.value)
 
                 if !selectorFailures.isEmpty {
-                    logger.info("未到達セレクタ: \(selectorFailures.joined(separator: ", "))")
+                    logger.info("Unmatched selectors: \(selectorFailures.joined(separator: ", "))")
                 }
 
                 if !textFailures.isEmpty {
-                    logger.info("未到達テキスト: \(textFailures.joined(separator: ", "))")
+                    logger.info("Unmatched text: \(textFailures.joined(separator: ", "))")
                 }
             }
 
             try await sleepUntilDeadlineOrThrow(
                 requested: configuration.wait.pollInterval,
                 deadline: deadline,
-                phase: "描画待機"
+                phase: "render wait"
             )
         }
     }
 
     private func waitForDOMStability(until deadline: Date) async throws {
-        logger.info("DOM 安定待機を開始します: \(configuration.wait.domStableDelay)s")
+        logger.info("Starting DOM stability wait: \(configuration.wait.domStableDelay)s")
 
         var lastSnapshot = try await evaluateDOMSnapshot()
         var lastChangeDate = Date()
 
         while true {
             if Date().timeIntervalSince(lastChangeDate) >= configuration.wait.domStableDelay {
-                logger.info("DOM が安定しました")
+                logger.info("DOM is stable")
                 return
             }
 
             try await sleepUntilDeadlineOrThrow(
                 requested: configuration.wait.pollInterval,
                 deadline: deadline,
-                phase: "描画待機"
+                phase: "render wait"
             )
 
             let snapshot = try await evaluateDOMSnapshot()
@@ -345,33 +345,33 @@ public final class WebScraper: NSObject {
                 lastChangeDate = Date()
 
                 if configuration.verbose {
-                    logger.info("DOM 変化を検知しました")
+                    logger.info("Detected a DOM change")
                 }
             }
         }
     }
 
     private func extract() async throws -> String {
-        logger.info("抽出処理を開始します")
+        logger.info("Starting extraction")
 
         let script: String
         let phase: String
 
         switch configuration.extraction {
         case .outerHTML:
-            phase = "HTML 抽出"
+            phase = "HTML extraction"
             script = makeSanitizedExtractionScript(for: .outerHTML)
         case .bodyText:
-            phase = "body.innerText 抽出"
+            phase = "body.innerText extraction"
             script = makeSanitizedExtractionScript(for: .bodyText)
         case .selectorInnerHTML(let selector):
-            phase = "selector innerHTML 抽出"
+            phase = "selector innerHTML extraction"
             script = makeSanitizedExtractionScript(for: .selectorInnerHTML(selector))
         case .contentOnly:
-            phase = "本文 HTML 抽出"
+            phase = "content HTML extraction"
             script = makeSanitizedExtractionScript(for: .contentOnly)
         case .structureInspection:
-            phase = "構成確認"
+            phase = "structure inspection"
             script = makeSanitizedExtractionScript(for: .structureInspection)
         }
 
@@ -379,7 +379,7 @@ public final class WebScraper: NSObject {
 
         switch value {
         case .string(let stringValue):
-            logger.info("抽出完了")
+            logger.info("Extraction finished")
             if case .structureInspection = configuration.extraction {
                 return try StructureInspectionFormatter.render(json: stringValue)
             }
@@ -387,7 +387,7 @@ public final class WebScraper: NSObject {
             return try await applyImageExtractionIfNeeded(to: stringValue)
         case .null:
             if case .selectorInnerHTML(let selector) = configuration.extraction {
-                throw ScraperError.extractionFailed("セレクタに一致する要素が見つかりません: \(selector)")
+                throw ScraperError.extractionFailed("No element matches the selector: \(selector)")
             }
 
             throw ScraperError.unexpectedJavaScriptResult(
@@ -406,7 +406,7 @@ public final class WebScraper: NSObject {
             return output
         }
 
-        logger.info("画像候補の収集を開始します")
+        logger.info("Starting image candidate collection")
         let candidates = try await evaluateImageCandidates()
         let evaluatedImages = ImageHeuristics.evaluate(candidates, configuration: configuration.imageExtraction)
         let keptCount = evaluatedImages.filter { $0.shouldKeep(includeMaybe: configuration.imageExtraction.includeMaybe) }.count
@@ -420,7 +420,7 @@ public final class WebScraper: NSObject {
             logger.raw(debugJSON)
         }
 
-        logger.info("画像候補を \(evaluatedImages.count) 件評価し、\(keptCount) 件を残します")
+        logger.info("Evaluated \(evaluatedImages.count) image candidates, keeping \(keptCount)")
         return try ImageContentFilter.filter(
             output,
             sourceURL: configuration.url,
@@ -431,10 +431,10 @@ public final class WebScraper: NSObject {
     }
 
     private func evaluateImageCandidates() async throws -> [ImageCandidate] {
-        let rawValue = try await evaluateJavaScript(Self.makeImageCandidateScript(), phase: "画像候補収集")
+        let rawValue = try await evaluateJavaScript(Self.makeImageCandidateScript(), phase: "image candidate collection")
         guard case .string(let json) = rawValue else {
             throw ScraperError.unexpectedJavaScriptResult(
-                phase: "画像候補収集",
+                phase: "image candidate collection",
                 expected: "JSON String"
             )
         }
@@ -442,26 +442,26 @@ public final class WebScraper: NSObject {
         do {
             return try JSONDecoder().decode([ImageCandidate].self, from: Data(json.utf8))
         } catch {
-            throw ScraperError.javaScriptFailed("画像候補 JSON の解釈に失敗しました: \(error.localizedDescription)")
+            throw ScraperError.javaScriptFailed("Unable to parse the image candidate JSON: \(error.localizedDescription)")
         }
     }
 
     private func evaluatePDFLinkPayload() async throws -> PDFLinkExtractionPayload {
-        logger.info("PDF リンクの収集を開始します")
-        let rawValue = try await evaluateJavaScript(Self.makePDFLinkExtractionScript(), phase: "PDF リンク収集")
+        logger.info("Starting PDF link collection")
+        let rawValue = try await evaluateJavaScript(Self.makePDFLinkExtractionScript(), phase: "PDF link collection")
         guard case .string(let json) = rawValue else {
             throw ScraperError.unexpectedJavaScriptResult(
-                phase: "PDF リンク収集",
+                phase: "PDF link collection",
                 expected: "JSON String"
             )
         }
 
         do {
             let payload = try JSONDecoder().decode(PDFLinkExtractionPayload.self, from: Data(json.utf8))
-            logger.info("PDF リンクを \(payload.links.count) 件収集しました")
+            logger.info("Collected \(payload.links.count) PDF links")
             return payload
         } catch {
-            throw ScraperError.javaScriptFailed("PDF リンク JSON の解釈に失敗しました: \(error.localizedDescription)")
+            throw ScraperError.javaScriptFailed("Unable to parse the PDF link JSON: \(error.localizedDescription)")
         }
     }
 
@@ -490,10 +490,10 @@ public final class WebScraper: NSObject {
         })()
         """
 
-        let rawValue = try await evaluateJavaScript(script, phase: "描画待機条件評価")
+        let rawValue = try await evaluateJavaScript(script, phase: "render wait condition evaluation")
         guard case .string(let json) = rawValue else {
             throw ScraperError.unexpectedJavaScriptResult(
-                phase: "描画待機条件評価",
+                phase: "render wait condition evaluation",
                 expected: "JSON String"
             )
         }
@@ -501,15 +501,15 @@ public final class WebScraper: NSObject {
         do {
             return try JSONDecoder().decode(RenderProbeResult.self, from: Data(json.utf8))
         } catch {
-            throw ScraperError.javaScriptFailed("待機条件評価の JSON 解釈に失敗しました: \(error.localizedDescription)")
+            throw ScraperError.javaScriptFailed("Unable to parse the wait condition JSON: \(error.localizedDescription)")
         }
     }
 
     private func evaluateAutoScrollStep() async throws -> AutoScrollProbeResult {
-        let rawValue = try await evaluateJavaScript(Self.makeAutoScrollScript(), phase: "自動スクロール")
+        let rawValue = try await evaluateJavaScript(Self.makeAutoScrollScript(), phase: "auto scroll")
         guard case .string(let json) = rawValue else {
             throw ScraperError.unexpectedJavaScriptResult(
-                phase: "自動スクロール",
+                phase: "auto scroll",
                 expected: "JSON String"
             )
         }
@@ -517,19 +517,19 @@ public final class WebScraper: NSObject {
         do {
             return try JSONDecoder().decode(AutoScrollProbeResult.self, from: Data(json.utf8))
         } catch {
-            throw ScraperError.javaScriptFailed("自動スクロール結果の JSON 解釈に失敗しました: \(error.localizedDescription)")
+            throw ScraperError.javaScriptFailed("Unable to parse the auto scroll JSON: \(error.localizedDescription)")
         }
     }
 
     private func evaluateDOMSnapshot() async throws -> String {
         let rawValue = try await evaluateJavaScript(
             "document.documentElement ? document.documentElement.outerHTML : ''",
-            phase: "DOM 安定確認"
+            phase: "DOM stability check"
         )
 
         guard case .string(let snapshot) = rawValue else {
             throw ScraperError.unexpectedJavaScriptResult(
-                phase: "DOM 安定確認",
+                phase: "DOM stability check",
                 expected: "String"
             )
         }
@@ -631,7 +631,7 @@ public final class WebScraper: NSObject {
                 return
             }
 
-            logger.info("タイムアウト: \(error.localizedDescription)")
+            logger.info("Timed out: \(error.localizedDescription)")
             operation()
         }
     }

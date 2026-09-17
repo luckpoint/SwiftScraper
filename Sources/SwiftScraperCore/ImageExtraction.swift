@@ -393,7 +393,7 @@ enum ImageContentFilter {
             try removeDroppedImages(from: document, sourceURL: sourceURL, allowedSources: allowedSources)
             return try document.outerHtml()
         } catch {
-            throw ScraperError.extractionFailed("画像フィルタリングに失敗しました: \(error.localizedDescription)")
+            throw ScraperError.extractionFailed("Image filtering failed: \(error.localizedDescription)")
         }
     }
 
@@ -406,7 +406,7 @@ enum ImageContentFilter {
             }
             return html
         } catch {
-            throw ScraperError.extractionFailed("画像フィルタリングに失敗しました: \(error.localizedDescription)")
+            throw ScraperError.extractionFailed("Image filtering failed: \(error.localizedDescription)")
         }
     }
 
@@ -537,7 +537,7 @@ enum ImageDebugFormatter {
             let data = try encoder.encode(payload)
             return String(decoding: data, as: UTF8.self)
         } catch {
-            throw ScraperError.outputFailed("画像デバッグ JSON を生成できません: \(error.localizedDescription)")
+            throw ScraperError.outputFailed("Unable to generate the image debug JSON: \(error.localizedDescription)")
         }
     }
 }

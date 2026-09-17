@@ -9,7 +9,7 @@ final class BatchRunFormatterTests: XCTestCase {
             sourceLocation: "/tmp/urls.txt",
             pages: [
                 .succeeded(url: URL(string: "https://example.com/one")!, output: "<html>one</html>"),
-                .failed(url: URL(string: "https://example.com/two")!, error: "ページロードに失敗しました"),
+                .failed(url: URL(string: "https://example.com/two")!, error: "Page load failed"),
             ]
         )
 
@@ -27,6 +27,6 @@ final class BatchRunFormatterTests: XCTestCase {
         XCTAssertNil(decoded.pages[0].error)
         XCTAssertEqual(decoded.pages[1].url, "https://example.com/two")
         XCTAssertNil(decoded.pages[1].output)
-        XCTAssertEqual(decoded.pages[1].error, "ページロードに失敗しました")
+        XCTAssertEqual(decoded.pages[1].error, "Page load failed")
     }
 }

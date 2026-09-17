@@ -55,7 +55,7 @@ final class URLFileResolverTests: XCTestCase {
                 return XCTFail("urlFileFailed expected")
             }
 
-            XCTAssertTrue(message.contains("2 行目が URL として不正です"))
+            XCTAssertTrue(message.contains("line 2 is not a valid URL"))
         }
     }
 }

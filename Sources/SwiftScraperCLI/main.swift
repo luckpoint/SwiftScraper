@@ -12,7 +12,7 @@ struct SwiftScraperCLI {
                 Foundation.exit(0)
             case .run(let configuration):
                 let logger = StderrLogger(verbose: configuration.verbose)
-                logger.info("CLI を開始します")
+                logger.info("Starting the CLI")
                 let exitCode = ScraperLauncher(configuration: configuration).run()
                 Foundation.exit(exitCode)
             case .pdf(let pdfConfiguration):

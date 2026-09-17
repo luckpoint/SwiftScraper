@@ -112,7 +112,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--bidi-host` / `--bidi-port` は `--bidi-server` と一緒に指定してください")
+                .invalidArgument("`--bidi-host` / `--bidi-port` require `--bidi-server`")
             )
         }
     }
@@ -124,7 +124,7 @@ final class CLIParserTests: XCTestCase {
                 "--output", "out/page.html",
             ])
         ) { error in
-            XCTAssertEqual(error as? ScraperError, .invalidArgument("`--output` は `--bidi-server` では使用できません"))
+            XCTAssertEqual(error as? ScraperError, .invalidArgument("`--output` cannot be used with `--bidi-server`"))
         }
     }
 
@@ -255,7 +255,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--cookie-jar` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+                .invalidArgument("`--cookie-jar` cannot be used with batch execution (`--sitemap` / `--url-file`)")
             )
         }
     }
@@ -269,7 +269,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--cookie-jar` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+                .invalidArgument("`--cookie-jar` cannot be used with batch execution (`--sitemap` / `--url-file`)")
             )
         }
     }
@@ -282,7 +282,7 @@ final class CLIParserTests: XCTestCase {
                 "--cookie-jar", "other-cookies.json",
             ])
         ) { error in
-            XCTAssertEqual(error as? ScraperError, .invalidArgument("`--cookie-jar` は 1 つだけ指定してください"))
+            XCTAssertEqual(error as? ScraperError, .invalidArgument("`--cookie-jar` may be specified only once"))
         }
     }
 
@@ -502,7 +502,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--concurrency` は `--sitemap` または `--url-file` と一緒に指定してください")
+                .invalidArgument("`--concurrency` requires `--sitemap` or `--url-file`")
             )
         }
     }
@@ -517,7 +517,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("--concurrency は 1 以上で指定してください")
+                .invalidArgument("--concurrency must be 1 or greater")
             )
         }
     }
@@ -545,7 +545,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--url-file` を使う場合は URL を同時に指定できません")
+                .invalidArgument("A URL cannot be specified together with `--url-file`")
             )
         }
     }
@@ -561,7 +561,7 @@ final class CLIParserTests: XCTestCase {
             XCTAssertEqual(
                 error as? ScraperError,
                 .invalidArgument(
-                    "抽出モードは `--body-text` / `--selector-inner-html` / `--content-only` / `--inspect-structure` のうち 1 つだけ指定できます"
+                    "Only one extraction mode may be specified among `--body-text` / `--selector-inner-html` / `--content-only` / `--inspect-structure`"
                 )
             )
         }
@@ -577,7 +577,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--markdown` と `--pretty-print` は同時に指定できません")
+                .invalidArgument("`--markdown` and `--pretty-print` cannot be used together")
             )
         }
     }
@@ -592,7 +592,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--markdown` は HTML を返す抽出モードでだけ指定できます")
+                .invalidArgument("`--markdown` requires an extraction mode that returns HTML")
             )
         }
     }
@@ -607,7 +607,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--extract-images` は HTML を返す抽出モードでだけ指定できます")
+                .invalidArgument("`--extract-images` requires an extraction mode that returns HTML")
             )
         }
     }
@@ -622,7 +622,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("--image-score-threshold は 0.0 以上 1.0 以下で指定してください")
+                .invalidArgument("--image-score-threshold must be between 0.0 and 1.0")
             )
         }
     }
@@ -793,7 +793,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--pdf` と `--download-pdfs` は同時に指定できません")
+                .invalidArgument("`--pdf` and `--download-pdfs` cannot be used together")
             )
         }
     }
@@ -807,7 +807,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--pdf` と `--download-linked-pdfs` は同時に指定できません")
+                .invalidArgument("`--pdf` and `--download-linked-pdfs` cannot be used together")
             )
         }
     }
@@ -820,7 +820,7 @@ final class CLIParserTests: XCTestCase {
                 "--output", "out/result.json",
             ])
         ) { error in
-            XCTAssertEqual(error as? ScraperError, .invalidArgument("`--output` は `--download-pdfs` では使用できません"))
+            XCTAssertEqual(error as? ScraperError, .invalidArgument("`--output` cannot be used with `--download-pdfs`"))
         }
     }
 
@@ -835,7 +835,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--cookie-jar` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+                .invalidArgument("`--cookie-jar` cannot be used with batch execution (`--sitemap` / `--url-file`)")
             )
         }
     }
@@ -850,7 +850,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--download-pdfs` と `--download-linked-pdfs` は同時に指定できません")
+                .invalidArgument("`--download-pdfs` and `--download-linked-pdfs` cannot be used together")
             )
         }
     }
@@ -864,7 +864,7 @@ final class CLIParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? ScraperError,
-                .invalidArgument("`--overwrite-pdfs` は `--download-pdfs` または `--download-linked-pdfs` と一緒に指定してください")
+                .invalidArgument("`--overwrite-pdfs` requires `--download-pdfs` or `--download-linked-pdfs`")
             )
         }
     }

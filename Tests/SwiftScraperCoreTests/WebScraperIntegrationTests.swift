@@ -154,7 +154,7 @@ final class WebScraperIntegrationTests: XCTestCase {
             _ = try await scraper.run()
             XCTFail("timedOut expected")
         } catch let error as ScraperError {
-            XCTAssertEqual(error, .timedOut(phase: "描画待機", timeout: 0.3))
+            XCTAssertEqual(error, .timedOut(phase: "render wait", timeout: 0.3))
         }
 
         try await allowWebKitToSettle()

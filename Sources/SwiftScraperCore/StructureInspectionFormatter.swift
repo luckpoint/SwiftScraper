@@ -38,7 +38,7 @@ enum StructureInspectionFormatter {
         do {
             report = try JSONDecoder().decode(Report.self, from: data)
         } catch {
-            throw ScraperError.extractionFailed("構成レポートの JSON 解釈に失敗しました: \(error.localizedDescription)")
+            throw ScraperError.extractionFailed("Unable to parse the structure report JSON: \(error.localizedDescription)")
         }
 
         let title = report.title.isEmpty ? "(empty)" : report.title

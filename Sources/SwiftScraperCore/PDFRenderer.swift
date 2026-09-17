@@ -10,9 +10,9 @@ public final class PDFRenderer {
     }
 
     public func render(html: String, outputURL: URL) throws {
-        logger.info("HTML を NSAttributedString に変換します")
+        logger.info("Converting HTML to NSAttributedString")
         guard let htmlData = html.data(using: .utf8) else {
-            throw ScraperError.pdfRenderFailed("HTML を UTF-8 データに変換できませんでした")
+            throw ScraperError.pdfRenderFailed("Unable to convert the HTML to UTF-8 data")
         }
 
         let attrStr = try NSAttributedString(
@@ -55,7 +55,7 @@ public final class PDFRenderer {
 
         layoutManager.ensureLayout(for: textContainer)
         let usedRect = layoutManager.usedRect(for: textContainer)
-        logger.info("レイアウト完了: \(Int(usedRect.height)) pt")
+        logger.info("Layout finished: \(Int(usedRect.height)) pt")
 
         let textView = NSTextView(
             frame: NSRect(x: 0, y: 0, width: contentWidth, height: usedRect.height)
@@ -64,14 +64,14 @@ public final class PDFRenderer {
         textView.isEditable = false
         textView.isSelectable = false
 
-        logger.info("PDF を生成します")
+        logger.info("Generating the PDF")
         let printOp = NSPrintOperation(view: textView, printInfo: printInfo)
         printOp.showsPrintPanel = false
         printOp.showsProgressPanel = false
         printOp.canSpawnSeparateThread = false
 
         guard printOp.run() else {
-            throw ScraperError.pdfRenderFailed("印刷操作に失敗しました")
+            throw ScraperError.pdfRenderFailed("The print operation failed")
         }
     }
 }

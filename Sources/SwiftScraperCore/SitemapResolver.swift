@@ -21,7 +21,7 @@ struct SitemapResolver: Sendable {
 
     func resolve(startingFrom inputURL: URL) async throws -> ResolvedSitemap {
         let sitemapURL = Self.resolveSitemapURL(from: inputURL)
-        logger.info("sitemap を取得します: \(sitemapURL.absoluteString)")
+        logger.info("Fetching the sitemap: \(sitemapURL.absoluteString)")
 
         var pendingSitemaps = [sitemapURL]
         var visitedSitemaps: Set<String> = []
@@ -50,7 +50,7 @@ struct SitemapResolver: Sendable {
         }
 
         guard !pageURLs.isEmpty else {
-            throw ScraperError.sitemapParseFailed("URL が見つかりませんでした: \(sitemapURL.absoluteString)")
+            throw ScraperError.sitemapParseFailed("No URLs found: \(sitemapURL.absoluteString)")
         }
 
         return ResolvedSitemap(sitemapURL: sitemapURL, pageURLs: pageURLs)
@@ -84,7 +84,7 @@ struct SitemapResolver: Sendable {
         let data = try await loadData(from: sitemapURL)
 
         if data.starts(with: [0x1f, 0x8b]) {
-            throw ScraperError.sitemapParseFailed("gzip 圧縮された sitemap は未対応です: \(sitemapURL.absoluteString)")
+            throw ScraperError.sitemapParseFailed("gzip-compressed sitemaps are not supported: \(sitemapURL.absoluteString)")
         }
 
         return try SitemapDocumentParser.parse(data: data, baseURL: sitemapURL)
@@ -141,7 +141,7 @@ final class SitemapDocumentParser: NSObject, XMLParserDelegate {
         guard parser.parse() else {
             let message = delegate.parserErrorMessage
                 ?? parser.parserError?.localizedDescription
-                ?? "不明な XML エラー"
+                ?? "Unknown XML error"
             throw ScraperError.sitemapParseFailed("\(baseURL.absoluteString): \(message)")
         }
 
@@ -195,7 +195,7 @@ final class SitemapDocumentParser: NSObject, XMLParserDelegate {
     private func makeDocument() throws -> SitemapDocument {
         if let invalidLocation = invalidLocations.first {
             throw ScraperError.sitemapParseFailed(
-                "\(baseURL.absoluteString): URL として解釈できない loc があります: \(invalidLocation)"
+                "\(baseURL.absoluteString): A loc could not be interpreted as a URL: \(invalidLocation)"
             )
         }
 

@@ -41,13 +41,13 @@ public enum CLIParser {
             case "--download-pdfs":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 guard state.pdfDownloadDirectory == nil else {
-                    throw ScraperError.invalidArgument("`--download-pdfs` は 1 つだけ指定してください")
+                    throw ScraperError.invalidArgument("`--download-pdfs` may be specified only once")
                 }
                 state.pdfDownloadDirectory = resolvePath(raw)
             case "--download-linked-pdfs":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 guard state.linkedPDFDownloadDirectory == nil else {
-                    throw ScraperError.invalidArgument("`--download-linked-pdfs` は 1 つだけ指定してください")
+                    throw ScraperError.invalidArgument("`--download-linked-pdfs` may be specified only once")
                 }
                 state.linkedPDFDownloadDirectory = resolvePath(raw)
             case "--overwrite-pdfs":
@@ -65,24 +65,24 @@ public enum CLIParser {
             case "--cookie-jar":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 guard state.cookieJar == nil else {
-                    throw ScraperError.invalidArgument("`--cookie-jar` は 1 つだけ指定してください")
+                    throw ScraperError.invalidArgument("`--cookie-jar` may be specified only once")
                 }
                 state.cookieJar = resolvePath(raw)
             case "--browser-cookies":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 guard state.browserCookieBrowser == nil else {
-                    throw ScraperError.invalidArgument("`--browser-cookies` は 1 つだけ指定してください")
+                    throw ScraperError.invalidArgument("`--browser-cookies` may be specified only once")
                 }
                 guard let browser = BrowserCookieBrowser(rawValue: raw.lowercased()) else {
                     throw ScraperError.invalidArgument(
-                        "`--browser-cookies` は chrome または firefox のみ対応しています。Brave、Windows/Linux、Firefox コンテナは対象外です"
+                        "`--browser-cookies` supports chrome or firefox only. Brave, Windows/Linux and Firefox containers are out of scope"
                     )
                 }
                 state.browserCookieBrowser = browser
             case "--browser-profile":
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 guard state.browserProfile == nil, !raw.isEmpty else {
-                    throw ScraperError.invalidArgument("`--browser-profile` は 1 つだけ指定し、空にできません")
+                    throw ScraperError.invalidArgument("`--browser-profile` may be specified only once and cannot be empty")
                 }
                 state.browserProfile = raw
             case "--header":
@@ -95,7 +95,7 @@ public enum CLIParser {
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 guard let parsed = VisibilityMode(rawValue: raw) else {
                     throw ScraperError.invalidArgument(
-                        "--visibility は \(VisibilityMode.allCases.map(\.rawValue).joined(separator: ", ")) のいずれかを指定してください"
+                        "--visibility must be one of \(VisibilityMode.allCases.map(\.rawValue).joined(separator: ", "))"
                     )
                 }
                 state.visibility = parsed
@@ -161,7 +161,7 @@ public enum CLIParser {
                 let raw = try nextValue(after: &index, arguments: normalizedArguments, option: argument)
                 guard let parsed = ImageFilterMode(rawValue: raw) else {
                     throw ScraperError.invalidArgument(
-                        "--image-filter は \(ImageFilterMode.allCases.map(\.rawValue).joined(separator: ", ")) のいずれかを指定してください"
+                        "--image-filter must be one of \(ImageFilterMode.allCases.map(\.rawValue).joined(separator: ", "))"
                     )
                 }
                 state.imageFilter = parsed
@@ -252,47 +252,47 @@ public enum CLIParser {
 
         mutating func makeCommand(browserCookieReader: (any BrowserCookieReader)?) throws -> CLICommand {
             if browserProfile != nil && browserCookieBrowser == nil {
-                throw ScraperError.invalidArgument("`--browser-profile` は `--browser-cookies chrome|firefox` と一緒に指定してください")
+                throw ScraperError.invalidArgument("`--browser-profile` requires `--browser-cookies chrome|firefox`")
             }
 
             if browserCookieBrowser != nil && cookieJar != nil {
-                throw ScraperError.invalidArgument("`--browser-cookies` と `--cookie-jar` は併用できません")
+                throw ScraperError.invalidArgument("`--browser-cookies` cannot be combined with `--cookie-jar`")
             }
 
             if overwritePDFs && pdfDownloadDirectory == nil && linkedPDFDownloadDirectory == nil {
-                throw ScraperError.invalidArgument("`--overwrite-pdfs` は `--download-pdfs` または `--download-linked-pdfs` と一緒に指定してください")
+                throw ScraperError.invalidArgument("`--overwrite-pdfs` requires `--download-pdfs` or `--download-linked-pdfs`")
             }
 
             if bidiServer && pdfInputPath != nil {
-                throw ScraperError.invalidArgument("`--bidi-server` と `--pdf` は同時に指定できません")
+                throw ScraperError.invalidArgument("`--bidi-server` and `--pdf` cannot be used together")
             }
 
             if bidiServer && pdfDownloadDirectory != nil {
-                throw ScraperError.invalidArgument("`--bidi-server` と `--download-pdfs` は同時に指定できません")
+                throw ScraperError.invalidArgument("`--bidi-server` and `--download-pdfs` cannot be used together")
             }
 
             if bidiServer && linkedPDFDownloadDirectory != nil {
-                throw ScraperError.invalidArgument("`--bidi-server` と `--download-linked-pdfs` は同時に指定できません")
+                throw ScraperError.invalidArgument("`--bidi-server` and `--download-linked-pdfs` cannot be used together")
             }
 
             if pdfInputPath != nil && pdfDownloadDirectory != nil {
-                throw ScraperError.invalidArgument("`--pdf` と `--download-pdfs` は同時に指定できません")
+                throw ScraperError.invalidArgument("`--pdf` and `--download-pdfs` cannot be used together")
             }
 
             if pdfInputPath != nil && linkedPDFDownloadDirectory != nil {
-                throw ScraperError.invalidArgument("`--pdf` と `--download-linked-pdfs` は同時に指定できません")
+                throw ScraperError.invalidArgument("`--pdf` and `--download-linked-pdfs` cannot be used together")
             }
 
             if pdfInputPath != nil && browserCookieBrowser != nil {
-                throw ScraperError.invalidArgument("`--browser-cookies` は `--pdf` では使用できません")
+                throw ScraperError.invalidArgument("`--browser-cookies` cannot be used with `--pdf`")
             }
 
             if pdfDownloadDirectory != nil && linkedPDFDownloadDirectory != nil {
-                throw ScraperError.invalidArgument("`--download-pdfs` と `--download-linked-pdfs` は同時に指定できません")
+                throw ScraperError.invalidArgument("`--download-pdfs` and `--download-linked-pdfs` cannot be used together")
             }
 
             if !bidiServer && (bidiHostSpecified || bidiPortSpecified) {
-                throw ScraperError.invalidArgument("`--bidi-host` / `--bidi-port` は `--bidi-server` と一緒に指定してください")
+                throw ScraperError.invalidArgument("`--bidi-host` / `--bidi-port` require `--bidi-server`")
             }
 
             if let pdfInputPath {
@@ -335,7 +335,7 @@ public enum CLIParser {
             } catch let error as BrowserCookieError {
                 throw ScraperError.browserCookieFailed(error.localizedDescription)
             } catch {
-                throw ScraperError.browserCookieFailed("データベースの読み取りに失敗しました")
+                throw ScraperError.browserCookieFailed("Unable to read the database")
             }
         }
 
@@ -387,23 +387,23 @@ public enum CLIParser {
 
         private func makeBiDiServerCommand() throws -> CLICommand {
             if batchInput != nil {
-                throw ScraperError.invalidArgument("`--bidi-server` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+                throw ScraperError.invalidArgument("`--bidi-server` cannot be used with batch execution (`--sitemap` / `--url-file`)")
             }
 
             if concurrencySpecified {
-                throw ScraperError.invalidArgument("`--concurrency` は `--bidi-server` では使用できません")
+                throw ScraperError.invalidArgument("`--concurrency` cannot be used with `--bidi-server`")
             }
 
             if cookieJar != nil {
-                throw ScraperError.invalidArgument("`--cookie-jar` は `--bidi-server` では使用できません")
+                throw ScraperError.invalidArgument("`--cookie-jar` cannot be used with `--bidi-server`")
             }
 
             if case .file = output {
-                throw ScraperError.invalidArgument("`--output` は `--bidi-server` では使用できません")
+                throw ScraperError.invalidArgument("`--output` cannot be used with `--bidi-server`")
             }
 
             if extractionFlagCount > 0 || outputFormat != .plain || imageExtractionEnabled || prettyPrint {
-                throw ScraperError.invalidArgument("抽出・整形・変換オプションは `--bidi-server` では使用できません")
+                throw ScraperError.invalidArgument("Extraction, formatting and conversion options cannot be used with `--bidi-server`")
             }
 
             return .bidiServer(
@@ -471,62 +471,62 @@ public enum CLIParser {
         private func validateRunOptions() throws {
             if extractionFlagCount > 1 {
                 throw ScraperError.invalidArgument(
-                    "抽出モードは `--body-text` / `--selector-inner-html` / `--content-only` / `--inspect-structure` のうち 1 つだけ指定できます"
+                    "Only one extraction mode may be specified among `--body-text` / `--selector-inner-html` / `--content-only` / `--inspect-structure`"
                 )
             }
 
             if outputFormat == .markdown && prettyPrint {
-                throw ScraperError.invalidArgument("`--markdown` と `--pretty-print` は同時に指定できません")
+                throw ScraperError.invalidArgument("`--markdown` and `--pretty-print` cannot be used together")
             }
 
             if outputFormat == .markdown && !CLIParser.supportsMarkdown(extraction) {
-                throw ScraperError.invalidArgument("`--markdown` は HTML を返す抽出モードでだけ指定できます")
+                throw ScraperError.invalidArgument("`--markdown` requires an extraction mode that returns HTML")
             }
 
             if imageExtractionEnabled && !CLIParser.supportsImageExtraction(extraction) {
-                throw ScraperError.invalidArgument("`--extract-images` は HTML を返す抽出モードでだけ指定できます")
+                throw ScraperError.invalidArgument("`--extract-images` requires an extraction mode that returns HTML")
             }
 
             if concurrencySpecified && batchInput == nil {
-                throw ScraperError.invalidArgument("`--concurrency` は `--sitemap` または `--url-file` と一緒に指定してください")
+                throw ScraperError.invalidArgument("`--concurrency` requires `--sitemap` or `--url-file`")
             }
 
             if cookieJar != nil && batchInput != nil {
-                throw ScraperError.invalidArgument("`--cookie-jar` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+                throw ScraperError.invalidArgument("`--cookie-jar` cannot be used with batch execution (`--sitemap` / `--url-file`)")
             }
 
             if case .urlFile = batchInput, url != nil {
-                throw ScraperError.invalidArgument("`--url-file` を使う場合は URL を同時に指定できません")
+                throw ScraperError.invalidArgument("A URL cannot be specified together with `--url-file`")
             }
 
             if case .sitemap = batchInput, url == nil {
-                throw ScraperError.invalidArgument("`--sitemap` を使う場合は対象サイトの URL を指定してください")
+                throw ScraperError.invalidArgument("`--sitemap` requires the target site URL")
             }
         }
 
         private func validatePDFDownloadOptions() throws {
             if concurrencySpecified && batchInput == nil {
-                throw ScraperError.invalidArgument("`--concurrency` は `--download-pdfs` では使用できません")
+                throw ScraperError.invalidArgument("`--concurrency` cannot be used with `--download-pdfs`")
             }
 
             if cookieJar != nil && batchInput != nil {
-                throw ScraperError.invalidArgument("`--cookie-jar` は batch 実行（`--sitemap` / `--url-file`）では使用できません")
+                throw ScraperError.invalidArgument("`--cookie-jar` cannot be used with batch execution (`--sitemap` / `--url-file`)")
             }
 
             if case .urlFile = batchInput, url != nil {
-                throw ScraperError.invalidArgument("`--url-file` を使う場合は URL を同時に指定できません")
+                throw ScraperError.invalidArgument("A URL cannot be specified together with `--url-file`")
             }
 
             if case .sitemap = batchInput, url == nil {
-                throw ScraperError.invalidArgument("`--sitemap` を使う場合は対象サイトの URL を指定してください")
+                throw ScraperError.invalidArgument("`--sitemap` requires the target site URL")
             }
 
             if case .file = output {
-                throw ScraperError.invalidArgument("`--output` は `--download-pdfs` では使用できません")
+                throw ScraperError.invalidArgument("`--output` cannot be used with `--download-pdfs`")
             }
 
             if extractionFlagCount > 0 || outputFormat != .plain || imageExtractionEnabled || prettyPrint {
-                throw ScraperError.invalidArgument("抽出・整形・変換オプションは `--download-pdfs` では使用できません")
+                throw ScraperError.invalidArgument("Extraction, formatting and conversion options cannot be used with `--download-pdfs`")
             }
         }
 
@@ -572,50 +572,50 @@ public enum CLIParser {
       swift-scraper --bidi-server [url] [--bidi-host <host>] [--bidi-port <port>] [options]
 
     Options:
-      --bidi-server                 WKWebView BiDi bridge server を起動
-      --bidi-host <host>            BiDi server の bind host。既定 127.0.0.1
-      --bidi-port <port>            BiDi server の bind port。既定 9222
-      --url <url>                    対象 URL を明示指定
-      --cookie <spec>                Cookie を 1 件追加
-      --cookie-file <path>           Cookie JSON を読み込む
-      --cookie-jar <path>            CookieJar JSON を読み込み、実行後に保存する
-      --browser-cookies <browser>    macOS Chrome または Firefox の Cookie を読み込む
-      --browser-profile <name|path>  ブラウザプロファイル名またはパス。未指定時は既定プロファイル
-      --header <Name: Value>         HTTP ヘッダーを追加。複数指定可
-      --persistent-store             永続 DataStore を使う
+      --bidi-server                  Start the WKWebView BiDi bridge server
+      --bidi-host <host>             BiDi server bind host; defaults to 127.0.0.1
+      --bidi-port <port>             BiDi server bind port; defaults to 9222
+      --url <url>                    Set the target URL explicitly
+      --cookie <spec>                Add one cookie
+      --cookie-file <path>           Load cookies from JSON
+      --cookie-jar <path>            Load CookieJar JSON and save it after execution
+      --browser-cookies <browser>    Load cookies from macOS Chrome or Firefox
+      --browser-profile <name|path>  Browser profile name or path; defaults to the default profile
+      --header <Name: Value>         Add an HTTP header; may be specified multiple times
+      --persistent-store             Use a persistent DataStore
       --visibility <mode>            windowless | hidden-window | visible-window
-      --viewport <width>x<height>    WebView サイズ。既定 1440x900
-      --wait-delay <seconds>         didFinish 後の固定待機
-      --auto-scroll                  lazy load 補助のため下方向へ自動スクロール
-      --wait-selector <css>          CSS セレクタ出現待機。複数指定可
-      --wait-text <text>             テキスト出現待機。複数指定可
-      --poll-interval <seconds>      条件待機のポーリング間隔。既定 0.5
-      --dom-stable-delay <seconds>   DOM が変化せず安定したとみなす時間。既定 0.5
-      --load-timeout <seconds>       ロード段階タイムアウト。既定 30
-      --wait-timeout <seconds>       描画待機タイムアウト。既定 15
-      --js-timeout <seconds>         evaluateJavaScript のタイムアウト。既定 10
-      --sitemap                      対象サイトの sitemap.xml をたどって複数 URL を取得
-      --url-file <path>              1 行 1 URL のファイルを読み込んで複数 URL を取得
-      --concurrency <count>          batch 取得時の並列数。既定 4
-      --output <path>                標準出力ではなくファイルへ保存
-      --download-pdfs <directory>    ページ内の PDF リンクを保存
-      --download-linked-pdfs <dir>   通常抽出と同時にページ内の PDF リンクを保存
-      --overwrite-pdfs               既存 PDF を連番回避せず同名で上書き
-      --body-text                    document.body.innerText を抽出
-      --selector-inner-html <css>    特定要素の innerHTML を抽出
-      --content-only                 ヘッダ・フッタ・サイドバー等を除いた本文候補の HTML を抽出
-      --inspect-structure            ページ構成と本文候補だけを確認し、HTML はダンプしない
-      --markdown                     HTML 系抽出結果を Markdown に変換して出力
-      --extract-images               画像 heuristic を適用して HTML 系出力の画像を絞り込む
+      --viewport <width>x<height>    WebView size; defaults to 1440x900
+      --wait-delay <seconds>         Fixed wait after didFinish
+      --auto-scroll                  Scroll downward to help trigger lazy loading
+      --wait-selector <css>          Wait for a CSS selector; may be specified multiple times
+      --wait-text <text>             Wait for text; may be specified multiple times
+      --poll-interval <seconds>      Condition polling interval; defaults to 0.5
+      --dom-stable-delay <seconds>   Time before the DOM is considered stable; defaults to 0.5
+      --load-timeout <seconds>       Load-stage timeout; defaults to 30
+      --wait-timeout <seconds>       Rendering wait timeout; defaults to 15
+      --js-timeout <seconds>         evaluateJavaScript timeout; defaults to 10
+      --sitemap                      Follow the target site's sitemap.xml for multiple URLs
+      --url-file <path>              Read one URL per line from a file
+      --concurrency <count>          Batch concurrency; defaults to 4
+      --output <path>                Save to a file instead of standard output
+      --download-pdfs <directory>    Save PDF links found on the page
+      --download-linked-pdfs <dir>   Save PDF links alongside normal extraction
+      --overwrite-pdfs               Replace existing PDFs instead of avoiding name collisions
+      --body-text                    Extract document.body.innerText
+      --selector-inner-html <css>    Extract innerHTML from selected elements
+      --content-only                 Extract content HTML without header, footer or sidebar
+      --inspect-structure            Inspect page structure and content candidates without dumping HTML
+      --markdown                     Convert HTML extraction results to Markdown
+      --extract-images               Apply image heuristics to narrow images in HTML output
       --image-filter <mode>          all | article-only
-      --image-score-threshold <0-1>  keep 判定の閾値。既定 0.65
-      --image-include-maybe          maybe 判定の画像も出力に残す
-      --image-debug                  画像スコアと理由を stderr に JSON で出す
-      --pretty-print                 HTML 系の出力を SwiftSoup で整形
-      --pdf <file.md>                Markdown ファイルを PDF に変換
-      --verbose                      stderr に進行ログを出す
-      --version                      バージョンを表示
-      --help                         ヘルプを表示
+      --image-score-threshold <0-1>  Keep threshold; defaults to 0.65
+      --image-include-maybe          Keep images classified as maybe
+      --image-debug                  Write image scores and reasons as JSON to stderr
+      --pretty-print                 Format HTML output with SwiftSoup
+      --pdf <file.md>                Convert a Markdown file to PDF
+      --verbose                      Write progress logs to stderr
+      --version                      Show the version
+      --help                         Show this help
 
     Cookie spec format:
       name=session;value=abc123;domain=example.com;path=/;secure=true;httpOnly=true;expires=2026-12-31T00:00:00Z
@@ -623,21 +623,21 @@ public enum CLIParser {
     Cookie file format:
       JSON array or object with keys:
       name, value, domain, path, secure, httpOnly, expires
-      --cookie-jar は同じ JSON 形式を使い、保存時は JSON array で書き出します。
-      --browser-cookies は chrome|firefox のみ対応（Brave、Windows/Linux、Firefox コンテナは対象外）。
-      --browser-cookies と --cookie-jar は併用できません。--cookie / --cookie-file が優先されます。
+      --cookie-jar uses the same JSON format and writes a JSON array when saving.
+      --browser-cookies supports chrome|firefox only (Brave, Windows/Linux and Firefox containers are out of scope).
+      --browser-cookies cannot be combined with --cookie-jar. --cookie / --cookie-file take precedence.
     """
 
     static func parseHeader(_ raw: String) throws -> (String, String) {
         guard let colonIndex = raw.firstIndex(of: ":") else {
-            throw ScraperError.invalidArgument("--header は 'Name: Value' 形式で指定してください")
+            throw ScraperError.invalidArgument("--header must use the 'Name: Value' format")
         }
 
         let name = raw[raw.startIndex..<colonIndex].trimmingCharacters(in: .whitespaces)
         let value = raw[raw.index(after: colonIndex)...].trimmingCharacters(in: .whitespaces)
 
         guard !name.isEmpty else {
-            throw ScraperError.invalidArgument("--header のヘッダー名が空です")
+            throw ScraperError.invalidArgument("--header has an empty header name")
         }
 
         return (name, value)
@@ -649,29 +649,29 @@ public enum CLIParser {
         for segment in raw.split(separator: ";", omittingEmptySubsequences: true) {
             let parts = segment.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
             guard parts.count == 2 else {
-                throw ScraperError.invalidCookieSpec("`key=value` 形式ではない要素があります: \(segment)")
+                throw ScraperError.invalidCookieSpec("A segment is not in `key=value` form: \(segment)")
             }
 
             let key = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
             let value = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
 
             guard !key.isEmpty else {
-                throw ScraperError.invalidCookieSpec("キーが空です")
+                throw ScraperError.invalidCookieSpec("A key is empty")
             }
 
             values[key] = value
         }
 
         guard let name = values.removeValue(forKey: "name"), !name.isEmpty else {
-            throw ScraperError.invalidCookieSpec("name が必要です")
+            throw ScraperError.invalidCookieSpec("name is required")
         }
 
         guard let value = values.removeValue(forKey: "value") else {
-            throw ScraperError.invalidCookieSpec("value が必要です")
+            throw ScraperError.invalidCookieSpec("value is required")
         }
 
         guard let domain = values.removeValue(forKey: "domain"), !domain.isEmpty else {
-            throw ScraperError.invalidCookieSpec("domain が必要です")
+            throw ScraperError.invalidCookieSpec("domain is required")
         }
 
         let path = values.removeValue(forKey: "path") ?? "/"
@@ -684,7 +684,7 @@ public enum CLIParser {
         let expires = try parseDate(values.removeValue(forKey: "expires"))
 
         if !values.isEmpty {
-            throw ScraperError.invalidCookieSpec("未対応キーがあります: \(values.keys.sorted().joined(separator: ", "))")
+            throw ScraperError.invalidCookieSpec("Unsupported keys: \(values.keys.sorted().joined(separator: ", "))")
         }
 
         return CookieDefinition(
@@ -721,7 +721,7 @@ public enum CLIParser {
 
     private static func ensureSingleURL(existing: URL?) throws {
         if existing != nil {
-            throw ScraperError.invalidArgument("URL は 1 つだけ指定してください")
+            throw ScraperError.invalidArgument("Only one URL may be specified")
         }
     }
 
@@ -738,7 +738,7 @@ public enum CLIParser {
             existingOption = "--url-file"
         }
 
-        throw ScraperError.invalidArgument("`\(existingOption)` と `\(incomingOption)` は同時に指定できません")
+        throw ScraperError.invalidArgument("`\(existingOption)` and `\(incomingOption)` cannot be used together")
     }
 
     private static func nextValue(after index: inout Int, arguments: [String], option: String) throws -> String {
@@ -758,7 +758,7 @@ public enum CLIParser {
               let height = Int(components[1]),
               width > 0,
               height > 0 else {
-            throw ScraperError.invalidArgument("--viewport は 1440x900 のように指定してください")
+            throw ScraperError.invalidArgument("--viewport must look like 1440x900")
         }
 
         return Viewport(width: width, height: height)
@@ -766,16 +766,16 @@ public enum CLIParser {
 
     private static func parseSeconds(_ raw: String, option: String, allowZero: Bool) throws -> TimeInterval {
         guard let value = TimeInterval(raw), value.isFinite else {
-            throw ScraperError.invalidArgument("\(option) は数値で指定してください")
+            throw ScraperError.invalidArgument("\(option) must be a number")
         }
 
         if allowZero {
             guard value >= 0 else {
-                throw ScraperError.invalidArgument("\(option) は 0 以上で指定してください")
+                throw ScraperError.invalidArgument("\(option) must be 0 or greater")
             }
         } else {
             guard value > 0 else {
-                throw ScraperError.invalidArgument("\(option) は 0 より大きい値で指定してください")
+                throw ScraperError.invalidArgument("\(option) must be greater than 0")
             }
         }
 
@@ -784,11 +784,11 @@ public enum CLIParser {
 
     private static func parseUnitDouble(_ raw: String, option: String) throws -> Double {
         guard let value = Double(raw), value.isFinite else {
-            throw ScraperError.invalidArgument("\(option) は数値で指定してください")
+            throw ScraperError.invalidArgument("\(option) must be a number")
         }
 
         guard (0...1).contains(value) else {
-            throw ScraperError.invalidArgument("\(option) は 0.0 以上 1.0 以下で指定してください")
+            throw ScraperError.invalidArgument("\(option) must be between 0.0 and 1.0")
         }
 
         return value
@@ -796,11 +796,11 @@ public enum CLIParser {
 
     private static func parsePositiveInt(_ raw: String, option: String) throws -> Int {
         guard let value = Int(raw) else {
-            throw ScraperError.invalidArgument("\(option) は整数で指定してください")
+            throw ScraperError.invalidArgument("\(option) must be an integer")
         }
 
         guard value > 0 else {
-            throw ScraperError.invalidArgument("\(option) は 1 以上で指定してください")
+            throw ScraperError.invalidArgument("\(option) must be 1 or greater")
         }
 
         return value
@@ -809,7 +809,7 @@ public enum CLIParser {
     private static func parsePort(_ raw: String, option: String) throws -> Int {
         let port = try parsePositiveInt(raw, option: option)
         guard port <= 65_535 else {
-            throw ScraperError.invalidArgument("\(option) は 1 以上 65535 以下で指定してください")
+            throw ScraperError.invalidArgument("\(option) must be between 1 and 65535")
         }
 
         return port
@@ -822,7 +822,7 @@ public enum CLIParser {
         case "false", "0", "no":
             return false
         default:
-            throw ScraperError.invalidCookieSpec("\(key) は true/false で指定してください")
+            throw ScraperError.invalidCookieSpec("\(key) must be true or false")
         }
     }
 
@@ -843,7 +843,7 @@ public enum CLIParser {
             return date
         }
 
-        throw ScraperError.invalidCookieSpec("expires は ISO8601 で指定してください")
+        throw ScraperError.invalidCookieSpec("expires must be an ISO8601 timestamp")
     }
 
     private static func resolvePath(_ raw: String) -> URL {

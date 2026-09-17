@@ -188,7 +188,7 @@ final class PDFDownloadFormatterTests: XCTestCase {
             outputDirectory: URL(fileURLWithPath: "/tmp/downloads"),
             pages: [
                 .succeeded(pageResult),
-                .failed(url: URL(string: "https://example.com/missing")!, error: "ページロードに失敗しました"),
+                .failed(url: URL(string: "https://example.com/missing")!, error: "Page load failed"),
             ]
         )
 

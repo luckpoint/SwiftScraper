@@ -63,20 +63,20 @@ public final class ScraperLauncher {
     }
 
     public func run() -> Int32 {
-        logger.info("ランチャーを初期化します")
-        logger.info("NSApplication を生成します")
+        logger.info("Initializing the launcher")
+        logger.info("Creating NSApplication")
         let application = NSApplication.shared
-        logger.info("ActivationPolicy を設定します: \(configuration.visibility.activationPolicy.rawValue)")
+        logger.info("Setting ActivationPolicy: \(configuration.visibility.activationPolicy.rawValue)")
         _ = application.setActivationPolicy(configuration.visibility.activationPolicy)
-        logger.info("NSApplication.finishLaunching を呼びます")
+        logger.info("Calling NSApplication.finishLaunching")
         application.finishLaunching()
-        logger.info("NSApplication.finishLaunching が返りました")
+        logger.info("NSApplication.finishLaunching returned")
         runLoop = CFRunLoopGetCurrent()
-        logger.info("スクレイパータスクを run loop へ投入します")
+        logger.info("Submitting the scraper task to the run loop")
 
         if let runLoop {
             CFRunLoopPerformBlock(runLoop, CFRunLoopMode.defaultMode.rawValue) { [self] in
-                logger.info("run loop 上でスクレイパータスクを開始します")
+                logger.info("Starting the scraper task on the run loop")
 
                 Task { @MainActor in
                     do {
@@ -107,9 +107,9 @@ public final class ScraperLauncher {
             }
         }
 
-        logger.info("CFRunLoopRun に入ります")
+        logger.info("Entering CFRunLoopRun")
         CFRunLoopRun()
-        logger.info("CFRunLoopRun を抜けました")
+        logger.info("Exited CFRunLoopRun")
         return exitCode
     }
 
@@ -151,7 +151,7 @@ public final class ScraperLauncher {
 
     private func makeBatchLaunchResult(_ batchMode: BatchMode) async throws -> LaunchResult {
         let resolved = try await resolveBatchSource(batchMode)
-        logger.info("\(resolved.kind) から \(resolved.pageURLs.count) 件の URL を解決しました")
+        logger.info("Resolved \(resolved.pageURLs.count) URLs from \(resolved.kind)")
 
         let concurrency = min(batchMode.concurrency, max(resolved.pageURLs.count, 1))
         let limiter = AsyncSemaphore(limit: concurrency)
@@ -277,7 +277,7 @@ public final class ScraperLauncher {
             pdfLinks: pdfLinks,
             configuration: configuration,
             logger: logger
-        ) ?? .failed(url: sourceURL, error: "PDF リンク収集結果がありません")
+        ) ?? .failed(url: sourceURL, error: "No PDF link collection result")
 
         let result = PDFDownloadBatchRunResult(
             sourceKind: sourceKind,
@@ -319,7 +319,7 @@ public final class ScraperLauncher {
         }
 
         guard let pdfLinks else {
-            return .failed(url: sourceURL, error: "PDF リンク収集結果がありません")
+            return .failed(url: sourceURL, error: "No PDF link collection result")
         }
 
         do {
@@ -347,7 +347,7 @@ public final class ScraperLauncher {
             )
             let json = try PDFDownloadFormatter.format(result)
             try json.write(to: manifestURL, atomically: true, encoding: .utf8)
-            logger.info("PDF ダウンロード結果を保存しました: \(manifestURL.path)")
+            logger.info("Saved the PDF download result: \(manifestURL.path)")
         } catch let error as ScraperError {
             throw error
         } catch {
@@ -373,7 +373,7 @@ public final class ScraperLauncher {
                     attributes: nil
                 )
                 try output.write(to: fileURL, atomically: true, encoding: .utf8)
-                logger.info("抽出結果を保存しました: \(fileURL.path)")
+                logger.info("Saved the extraction result: \(fileURL.path)")
             } catch {
                 throw ScraperError.outputFailed("\(fileURL.path): \(error.localizedDescription)")
             }

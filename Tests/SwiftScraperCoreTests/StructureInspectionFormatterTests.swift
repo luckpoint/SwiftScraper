@@ -54,7 +54,7 @@ final class StructureInspectionFormatterTests: XCTestCase {
                 return XCTFail("extractionFailed expected")
             }
 
-            XCTAssertTrue(message.contains("構成レポートの JSON 解釈に失敗しました"))
+            XCTAssertTrue(message.contains("Unable to parse the structure report JSON"))
         }
     }
 }

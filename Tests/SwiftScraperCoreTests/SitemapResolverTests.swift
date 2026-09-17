@@ -83,7 +83,7 @@ final class SitemapResolverTests: XCTestCase {
                 return XCTFail("sitemapParseFailed expected")
             }
 
-            XCTAssertTrue(message.contains("URL として解釈できない loc"))
+            XCTAssertTrue(message.contains("A loc could not be interpreted as a URL"))
         }
     }
 }

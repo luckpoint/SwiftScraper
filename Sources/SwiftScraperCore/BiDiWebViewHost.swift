@@ -381,7 +381,7 @@ final class BiDiWebViewHost: NSObject {
             }
         } else if case .null = rawValue,
                   case .selectorInnerHTML(let selector) = options.extraction {
-            throw ScraperError.extractionFailed("セレクタに一致する要素が見つかりません: \(selector)")
+            throw ScraperError.extractionFailed("No element matches the selector: \(selector)")
         } else {
             throw ScraperError.unexpectedJavaScriptResult(
                 phase: "scrape.extract",

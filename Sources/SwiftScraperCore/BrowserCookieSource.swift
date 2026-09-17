@@ -47,29 +47,29 @@ public enum BrowserCookieError: LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .unsupportedBrowser:
-            return "ブラウザ Cookie は macOS 13 以上の Chrome または Firefox のみ対応しています（Brave、Windows/Linux、Firefox コンテナは対象外です）"
+            return "Browser cookies are supported only for Chrome or Firefox on macOS 13 or later (Brave, Windows/Linux and Firefox containers are out of scope)"
         case .profileNotFound(let profile):
-            return "ブラウザプロファイルが見つかりません: " + profile
+            return "Browser profile not found: " + profile
         case .cookieDatabaseNotFound(let path):
-            return "ブラウザ Cookie データベースが見つかりません: " + path
+            return "Browser cookie database not found: " + path
         case .profileConfigurationUnreadable(let path):
-            return "Firefox profiles.ini を読み込めません: " + path
+            return "Unable to read Firefox profiles.ini: " + path
         case .databaseSnapshotFailed(let path):
-            return "ブラウザ Cookie データベースのスナップショットを作成できません: " + path
+            return "Unable to snapshot the browser cookie database: " + path
         case .databaseOpenFailed:
-            return "ブラウザ Cookie データベースを読み込めません"
+            return "Unable to open the browser cookie database"
         case .databaseQueryFailed:
-            return "ブラウザ Cookie データベースの読み取りに失敗しました"
+            return "Unable to read the browser cookie database"
         case .unsupportedSchema(let browser):
-            return browser + " の Cookie データベーススキーマに必要な列がありません"
+            return browser + " cookie database schema is missing a required column"
         case .keychainAccessDenied:
-            return "Chrome Safe Storage へのアクセスが拒否されました"
+            return "Access to Chrome Safe Storage was denied"
         case .keychainDataUnavailable:
-            return "Chrome Safe Storage の鍵情報を取得できません"
+            return "Unable to obtain the Chrome Safe Storage key"
         case .unsupportedEncryptionFormat:
-            return "Chrome Cookie の暗号化形式には対応していません"
+            return "Unsupported Chrome cookie encryption format"
         case .cookieDecryptionFailed:
-            return "Chrome Cookie の復号に失敗しました"
+            return "Unable to decrypt Chrome cookies"
         }
     }
 }

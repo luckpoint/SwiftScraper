@@ -278,7 +278,7 @@ final class BrowserCookieTests: XCTestCase {
             arguments: ["https://example.com", "--browser-cookies", "chrome", "--cookie-jar", "cookies.json"],
             browserCookieReader: reader
         )) { error in
-            XCTAssertEqual(error as? ScraperError, .invalidArgument("`--browser-cookies` と `--cookie-jar` は併用できません"))
+            XCTAssertEqual(error as? ScraperError, .invalidArgument("`--browser-cookies` cannot be combined with `--cookie-jar`"))
         }
 
         XCTAssertThrowsError(try CLIParser.parse(arguments: ["https://example.com", "--browser-cookies", "brave"])) { error in
