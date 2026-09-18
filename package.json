@@ -2,12 +2,15 @@
   "name": "swift-scraper-puppeteer-probe",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "puppeteer:bidi-p1": "node scripts/puppeteer-bidi-p1-smoke.mjs",
     "puppeteer:google": "node scripts/puppeteer-google-search.mjs",
     "puppeteer:yahoo": "node scripts/puppeteer-yahoo-search.mjs"
   },
   "devDependencies": {
-    "puppeteer-core": "^24.43.0"
+    "puppeteer-core": "^25.11.0"
   }
 }

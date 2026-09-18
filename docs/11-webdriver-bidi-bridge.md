@@ -42,6 +42,8 @@ swift run swift-scraper -- \
 ```
 
 ## Smoke test with Puppeteer
+The probe scripts require Node.js 24, pinned in `mise.toml`.
+
 The minimal probe for checking a Puppeteer WebDriver BiDi connection is:
 
 ```bash

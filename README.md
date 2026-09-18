@@ -21,7 +21,7 @@ It handles dynamic pages that a simple `URLSession` fetch cannot fully retrieve,
 ## Requirements
 - macOS 13 or later
 - Swift 6.0
-- Node.js 18 or later, only for the `npm run puppeteer:*` probe scripts
+- Node.js 24, only for the `npm run puppeteer:*` probe scripts (pinned in `mise.toml`)
 
 Because it uses `WKWebView` and AppKit, SwiftScraper runs only on macOS.
 The design aims to minimize user exposure rather than provide a fully headless browser.
