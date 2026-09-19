@@ -48,12 +48,17 @@ Generated binary:
 ```
 
 ### Installation
-Install with Homebrew (macOS 13 or later, with Xcode or the Command Line Tools):
+Install with Homebrew (macOS Sequoia or later, with Xcode or the Command Line Tools). The formula builds from source:
 
 ```bash
 brew tap luckpoint/swift-scraper
+brew trust luckpoint/swift-scraper
 brew install swift-scraper
 ```
+
+Homebrew refuses to load formulae from untrusted third-party taps, so `brew trust` is required before `brew install`.
+
+If `./scripts/install.sh` put a binary in `~/.local/bin`, it shadows the Homebrew one whenever it comes first in `PATH`. Remove it or reorder `PATH`.
 
 Build a release from source and install it at `~/.local/bin/swift-scraper`:
 
@@ -487,6 +492,11 @@ The workflow needs a PAT that can write to the tap, stored as the `HOMEBREW_TAP_
 On failure:
 - Version mismatch (the tap is not updated): `git tag -d v0.1.0 && git push --delete origin v0.1.0` → fix the constant, commit and push, then recreate and push the same tag
 - Formula update failure (for example, an expired PAT): `gh secret set HOMEBREW_TAP_GITHUB_TOKEN` → `gh run rerun <run-id> --failed`
+- The run succeeds but the formula keeps its old `sha256`: the action rewrites the formula only when the version changes, and logs `Skipping: the formula is already at version ...` otherwise. This happens when the formula already points at the tag, as it did for the first release. Set the checksum in the tap by hand:
+
+```bash
+curl -sL https://github.com/luckpoint/SwiftScraper/archive/refs/tags/v0.1.0.tar.gz | shasum -a 256
+```
 
 ## Documentation
 - [01. Page Loading](docs/01-page-loading.md)
