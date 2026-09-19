@@ -6,11 +6,15 @@
     "node": ">=24"
   },
   "scripts": {
+    "test:bidi-signals": "node --test scripts/bidi-signals.test.mjs",
+    "test:bidi-auth": "node --test scripts/bidi-auth.test.mjs",
+    "test:bidi-security": "node scripts/bidi-security-smoke.mjs",
     "puppeteer:bidi-p1": "node scripts/puppeteer-bidi-p1-smoke.mjs",
     "puppeteer:google": "node scripts/puppeteer-google-search.mjs",
     "puppeteer:yahoo": "node scripts/puppeteer-yahoo-search.mjs"
   },
   "devDependencies": {
-    "puppeteer-core": "^25.11.0"
+    "puppeteer-core": "^25.11.0",
+    "ws": "^8.21.3"
   }
 }

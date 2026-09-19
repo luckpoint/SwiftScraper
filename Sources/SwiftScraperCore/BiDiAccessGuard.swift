@@ -3,13 +3,23 @@ import Foundation
 enum BiDiAccessGuard {
     static let endpointPath = "/session"
 
+    // Resolve no user-supplied DNS names at bind time.
+    static func loopbackHost(_ host: String) throws -> String {
+        switch host.lowercased() {
+        case "localhost", "127.0.0.1": return "127.0.0.1"
+        case "::1": return "::1"
+        default:
+            throw ScraperError.invalidArgument("BiDi requires 127.0.0.1, ::1, or localhost; use an SSH tunnel for remote access")
+        }
+    }
+
     static func allowsUpgrade(uri: String, origin: String?, host: String?, bindHost: String) -> Bool {
         guard uri == endpointPath, origin == nil else {
             return false
         }
 
         guard let host else {
-            return true
+            return false
         }
 
         return allowsHostname(hostname(from: host), bindHost: bindHost)
@@ -36,16 +46,6 @@ enum BiDiAccessGuard {
     private static func allowsHostname(_ name: String, bindHost: String) -> Bool {
         name == bindHost
             || name.caseInsensitiveCompare("localhost") == .orderedSame
-            || isIPLiteral(name)
-    }
-
-    private static func isIPLiteral(_ name: String) -> Bool {
-        var v4 = in_addr()
-        if inet_pton(AF_INET, name, &v4) == 1 {
-            return true
-        }
-
-        var v6 = in6_addr()
-        return inet_pton(AF_INET6, name, &v6) == 1
+            || name == "127.0.0.1" || name == "::1"
     }
 }

@@ -17,6 +17,12 @@ SwiftNIO BiDi server
 ## Starting the server
 The default endpoint is `ws://127.0.0.1:9222/session`.
 
+Only loopback bind addresses are supported. Every WebSocket handshake requires
+`Authorization: Bearer <token>` and no `Origin` header. Each launch prints a
+`BiDi token file:` path, not the secret itself; clients read the owner-only file.
+The token grants full control, including access to imported cookies. Use an SSH
+tunnel and securely transfer the token for remote access.
+
 ```bash
 swift run swift-scraper -- \
   --bidi-server \
@@ -59,6 +65,11 @@ In another shell:
 ```bash
 npm run puppeteer:bidi-p1
 ```
+
+The scripts automatically find the matching local server's private token file.
+Authentication remains mandatory. For remote tunnels, different temporary
+directories, or ambiguous matches, set `SWIFTSCRAPER_BIDI_TOKEN_FILE` explicitly
+to the file path printed by the server. An explicit path takes precedence.
 
 `puppeteer:bidi-p1` starts a temporary HTTP server and fixture HTML on `127.0.0.1`, then checks `session.subscribe`, the `wait` option of `browsingContext.navigate`, `script.addPreloadScript` / `removePreloadScript`, `browsingContext.captureScreenshot`, `browsingContext.setViewport`, the runtime cookie API, JavaScript error responses, and SwiftScraper extension scraping commands without relying on an external site.
 
@@ -666,7 +677,9 @@ The BiDi server exposes a remote JavaScript execution endpoint. If it binds to a
 Recommendations:
 
 - Use the default `--bidi-host 127.0.0.1`
-- If remote exposure is required, add token authentication before using it
+- A fresh bearer token is required for every server run; non-loopback binds are rejected.
+  See README Access control for token-file setup and limits. Use an authenticated
+  encrypted tunnel (for example SSH) for remote access.
 - Restrict allowed origins or target URLs when appropriate
 - Do not run it with a sensitive browser profile
 

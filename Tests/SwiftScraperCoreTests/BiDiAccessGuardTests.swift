@@ -48,7 +48,7 @@ final class BiDiAccessGuardTests: XCTestCase {
     }
 
     func testAllowsLocalhostAndIPLiteralHosts() {
-        for host in ["localhost:9222", "LOCALHOST", "127.0.0.1:9222", "[::1]:9222", "192.168.1.4:9222"] {
+        for host in ["localhost:9222", "LOCALHOST", "127.0.0.1:9222", "[::1]:9222"] {
             XCTAssertTrue(
                 BiDiAccessGuard.allowsUpgrade(
                     uri: "/session",
@@ -70,6 +70,12 @@ final class BiDiAccessGuardTests: XCTestCase {
                 bindHost: "scraper.internal"
             )
         )
+    }
+
+    func testRejectsMissingOrExternalHost() {
+        for host: String? in [nil, "192.168.1.4:9222", "evil.example"] {
+            XCTAssertFalse(BiDiAccessGuard.allowsUpgrade(uri: "/session", origin: nil, host: host, bindHost: "127.0.0.1"))
+        }
     }
 
     func testAllowsWebAndAboutNavigation() throws {

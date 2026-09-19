@@ -73,7 +73,7 @@ final class CLIParserTests: XCTestCase {
     func testBiDiServerParsesInitialURLAndOptions() throws {
         let command = try CLIParser.parse(arguments: [
             "--bidi-server",
-            "--bidi-host", "0.0.0.0",
+            "--bidi-host", "::1",
             "--bidi-port", "9333",
             "--url", "https://example.com/app",
             "--visibility", "hidden-window",
@@ -90,7 +90,7 @@ final class CLIParserTests: XCTestCase {
             return XCTFail("bidi server configuration expected")
         }
 
-        XCTAssertEqual(configuration.host, "0.0.0.0")
+        XCTAssertEqual(configuration.host, "::1")
         XCTAssertEqual(configuration.port, 9333)
         XCTAssertEqual(configuration.initialURL?.absoluteString, "https://example.com/app")
         XCTAssertEqual(configuration.visibility, .hiddenWindow)

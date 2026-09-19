@@ -1,5 +1,5 @@
 import puppeteer from 'puppeteer-core';
-import { inspect } from 'node:util';
+import {bidiHeaders} from './bidi-auth.mjs';
 
 const endpoint = process.env.SWIFTSCRAPER_BIDI_ENDPOINT ?? 'ws://127.0.0.1:9222/session';
 const query = process.env.YAHOO_QUERY ?? 'Apple Swift';
@@ -63,6 +63,7 @@ async function main() {
 
   const browser = await puppeteer.connect({
     browserWSEndpoint: endpoint,
+    headers: bidiHeaders(endpoint),
     protocol: 'webDriverBiDi',
   });
 
@@ -203,7 +204,7 @@ main().catch(error => {
   if (error?.stack) {
     console.error(error.stack);
   } else {
-    console.error(inspect(error, { depth: 8, colors: false }));
+    console.error('Unknown connection or protocol error (details omitted to protect credentials).');
   }
   process.exitCode = 1;
 });

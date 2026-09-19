@@ -371,10 +371,52 @@ This bridge controls WKWebView over WebSocket for scraping. It is not a fully co
 The bridge grants full control of the `WKWebView` — arbitrary JavaScript, cookies, navigation — to anyone who can open the WebSocket, so connections are filtered before the upgrade:
 
 - Requests carrying an `Origin` header are refused. WebSockets are exempt from the same-origin policy, so without this any page you visit while the server runs could connect to `ws://127.0.0.1:9222/session` and drive the browser. Non-browser clients such as `puppeteer-core` send no `Origin` and are unaffected.
-- The `Host` header must be an IP literal, `localhost`, or the configured `--bidi-host`, which blocks DNS rebinding.
+- The `Host` header must be present and name a loopback endpoint (`127.0.0.1`, `::1`, or `localhost`), which blocks DNS rebinding.
 - `browsingContext.navigate` accepts only `http`, `https`, and `about` URLs, so a connected client cannot read local files through `file://`.
 
-There is no authentication beyond this. Binding to a non-loopback address with `--bidi-host` exposes the browser to everyone who can reach that port; do so only on a trusted network.
+Every connection requires `Authorization: Bearer <token>` during the WebSocket handshake.
+On each start, the server generates a new 256-bit token and prints the path of its
+owner-readable token file (0600 in a 0700 directory). The token itself is never
+logged. The generated directory is removed on normal shutdown, including Ctrl+C
+(SIGINT) and SIGTERM. SIGKILL, crashes, or power loss can leave files behind,
+but the next run uses a new token. Signal exits use status 130/143 respectively.
+
+Only `127.0.0.1`, `::1`, and `localhost` are accepted for `--bidi-host`.
+`localhost` binds to `127.0.0.1`. Remote access requires an SSH tunnel to the
+loopback listener and secure transfer of the token. Do not expose the listener
+through an unauthenticated proxy. Tokens grant full access to this WKWebView,
+including imported cookies; they do not isolate hostile processes running under
+your own OS account.
+
+The bundled Puppeteer clients automatically discover the matching local server
+in the current user's temporary directory; no environment variable is required.
+Discovery matches the endpoint's host and port, checks private file permissions
+and a live process, and refuses missing or ambiguous matches. Both processes must
+use the same temporary directory. Stale files from an exited process are ignored.
+
+For an SSH tunnel, a different temporary directory, or ambiguous discovery,
+explicitly set the file path printed by the server (this takes precedence):
+
+```bash
+export SWIFTSCRAPER_BIDI_TOKEN_FILE=/path/printed/by/server/token
+npm run puppeteer:bidi-p1
+```
+
+Custom clients must supply the Authorization header without an Origin header.
+The server permits four TCP connections, eight in-flight requests per connection,
+a 10-second handshake, 16 KiB text frames (fragmentation is unsupported), and
+responses/events up to 8 MiB. Excess traffic or output closes the connection.
+Output limits apply after serialization; they are not a hard memory limit on
+WebKit. JavaScript timeouts bound waiting, not guaranteed termination of scripts.
+
+Run the local security integration checks (starts its own temporary server and
+does not use your browser profile):
+
+```bash
+swift build
+npm ci
+npm run test:bidi-security
+```
 
 ## Extraction modes
 | Mode | Description |

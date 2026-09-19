@@ -309,6 +309,7 @@ public enum CLIParser {
                 return makePDFCommand(inputPath: pdfInputPath)
             }
 
+            if bidiServer { _ = try BiDiAccessGuard.loopbackHost(bidiHost) }
             try loadCookieFiles()
             try loadBrowserCookies(using: browserCookieReader)
 
@@ -397,6 +398,7 @@ public enum CLIParser {
         }
 
         private func makeBiDiServerCommand() throws -> CLICommand {
+            _ = try BiDiAccessGuard.loopbackHost(bidiHost)
             if batchInput != nil {
                 throw ScraperError.invalidArgument("`--bidi-server` cannot be used with batch execution (`--sitemap` / `--url-file`)")
             }
@@ -584,8 +586,8 @@ public enum CLIParser {
       swift-scraper --bidi-server [url] [--bidi-host <host>] [--bidi-port <port>] [options]
 
     Options:
-      --bidi-server                  Start the WKWebView BiDi bridge server
-      --bidi-host <host>             BiDi server bind host; defaults to 127.0.0.1
+      --bidi-server                  Start the WKWebView BiDi bridge (Bearer token file path printed on startup)
+      --bidi-host <host>             Loopback only: 127.0.0.1 (default), ::1, localhost
       --bidi-port <port>             BiDi server bind port; defaults to 9222
       --url <url>                    Set the target URL explicitly
       --cookie <spec>                Add one cookie

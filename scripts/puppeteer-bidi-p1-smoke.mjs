@@ -2,6 +2,8 @@ import http from 'node:http';
 import {once} from 'node:events';
 import {inspect} from 'node:util';
 import puppeteer from 'puppeteer-core';
+import WebSocket from 'ws';
+import {bidiHeaders} from './bidi-auth.mjs';
 
 const endpoint = process.env.SWIFTSCRAPER_BIDI_ENDPOINT ?? 'ws://127.0.0.1:9222/session';
 
@@ -132,7 +134,7 @@ function waitForWebSocket(webSocket, type) {
     };
     const handleError = event => {
       cleanup();
-      reject(new Error(`WebSocket ${type} wait failed: ${inspect(event)}`));
+      reject(new Error(`WebSocket ${type} wait failed`));
     };
 
     webSocket.addEventListener(type, handleEvent, {once: true});
@@ -141,7 +143,7 @@ function waitForWebSocket(webSocket, type) {
 }
 
 async function openRawBiDiConnection(url) {
-  const webSocket = new WebSocket(url);
+  const webSocket = new WebSocket(url, {headers: bidiHeaders(url)});
   const pending = new Map();
   let nextId = 1;
 
@@ -190,6 +192,7 @@ async function main() {
 
   const browser = await puppeteer.connect({
     browserWSEndpoint: endpoint,
+    headers: bidiHeaders(endpoint),
     protocol: 'webDriverBiDi',
   });
 
@@ -391,7 +394,7 @@ main().catch(error => {
   if (error?.stack) {
     console.error(error.stack);
   } else {
-    console.error(inspect(error, {depth: 8, colors: false}));
+    console.error('Unknown connection or protocol error (details omitted to protect credentials).');
   }
   process.exitCode = 1;
 });
