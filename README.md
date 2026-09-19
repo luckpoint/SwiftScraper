@@ -1,7 +1,11 @@
+![SwiftScraper — The rendered web, ready to extract.](logo/logo.png)
+
 # SwiftScraper
 
 A Swift CLI that uses macOS's native `WKWebView` to capture page content after JavaScript execution.
 It handles dynamic pages that a simple `URLSession` fetch cannot fully retrieve, with cookie injection, rendering waits, content extraction, Markdown conversion, and batch execution.
+
+By default, SwiftScraper captures the full rendered HTML. You can also extract likely article content or selected elements, convert HTML to Markdown, or retrieve the page's body text.
 
 ## Features
 - Capture the post-JavaScript-rendered DOM with `WKWebView`
