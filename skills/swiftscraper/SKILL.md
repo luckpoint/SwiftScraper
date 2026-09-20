@@ -1,6 +1,6 @@
 ---
 name: swiftscraper
-description: Use this skill when working with SwiftScraper, a macOS WKWebView-based Swift CLI and WebDriver BiDi-style scraping bridge. Covers CLI scraping, rendering waits, cookies and headers, batch scraping from sitemap or URL files, Markdown and image extraction, linked PDF downloads with `--download-pdfs` and `--download-linked-pdfs`, PDF generation from Markdown, BiDi server operation, Puppeteer/raw WebSocket clients, and troubleshooting SwiftScraper behavior.
+description: Use when working on the SwiftScraper repository in this workspace, a macOS WKWebView Swift CLI and WebDriver BiDi scraping bridge. Covers its CLI scraping, rendering waits, cookies and headers, sitemap and URL-file batch runs, Markdown and image extraction, linked PDF downloads, Markdown-to-PDF generation, BiDi server operation with Puppeteer or raw WebSocket clients, and edits to its Swift sources and tests. Do not use for general web-scraping questions, for Playwright, Puppeteer, or Selenium work unrelated to this repository, or for other scraping projects.
 ---
 
 # SwiftScraper
@@ -226,7 +226,7 @@ Default endpoint:
 ws://127.0.0.1:9222/session
 ```
 
-Use `--url <url>` to load an initial page before accepting commands. Keep the host bound to `127.0.0.1` unless a deployment explicitly protects the server.
+Use `--url <url>` to load an initial page before accepting commands. `--bidi-host` accepts only `127.0.0.1`, `::1`, or `localhost`; any other host is rejected at bind time. Use an SSH tunnel for remote access and transfer the token securely.
 
 For smoke testing:
 
@@ -234,16 +234,35 @@ For smoke testing:
 npm run puppeteer:bidi-p1
 ```
 
+Every connection requires `Authorization: Bearer <token>`. The server mints a fresh
+token per run and prints a `BiDi token file:` path, never the secret. Clients read
+that owner-only file; `scripts/bidi-auth.mjs` discovers it automatically for a local
+`/session` endpoint.
+
 For Puppeteer:
 
 ```js
 import puppeteer from 'puppeteer-core';
+import {bidiHeaders} from './scripts/bidi-auth.mjs';
+
+const endpoint = process.env.SWIFTSCRAPER_BIDI_ENDPOINT ?? 'ws://127.0.0.1:9222/session';
 
 const browser = await puppeteer.connect({
-  browserWSEndpoint: 'ws://127.0.0.1:9222/session',
+  browserWSEndpoint: endpoint,
+  headers: bidiHeaders(endpoint),
   protocol: 'webDriverBiDi',
 });
 ```
+
+For a raw WebSocket client, pass the same headers:
+
+```js
+const webSocket = new WebSocket(endpoint, {headers: bidiHeaders(endpoint)});
+```
+
+Set `SWIFTSCRAPER_BIDI_TOKEN_FILE` explicitly when discovery cannot pick a single
+match: a remote endpoint, a non-default temp directory, or several servers running
+at once. See `docs/11-webdriver-bidi-bridge.md` for the access-control model.
 
 Prefer canonical SwiftScraper extension commands:
 
