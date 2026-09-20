@@ -1,0 +1,113 @@
+{
+  "skill": "swiftscraper",
+  "cases": [
+    {
+      "id": "happy-article-markdown",
+      "group": "happy",
+      "prompt": "Scrape the main article text from https://example.com/article as Markdown and save it to out/article.md.",
+      "expect": ["swift run swift-scraper -- ", "--content-only", "--markdown", "--output"],
+      "reject": ["--pretty-print"]
+    },
+    {
+      "id": "happy-sitemap-batch",
+      "group": "happy",
+      "prompt": "I need every page in https://example.com's sitemap scraped as Markdown, four at a time, into one JSON file.",
+      "expect": ["--sitemap", "--markdown", "--concurrency"],
+      "reject": ["--cookie-jar"]
+    },
+    {
+      "id": "happy-linked-pdfs",
+      "group": "happy",
+      "prompt": "Download every PDF linked from https://example.com/legal/trust/ into a downloads folder. The page lazy-loads.",
+      "expect": ["--download-pdfs|--download-linked-pdfs", "--auto-scroll"],
+      "reject": []
+    },
+    {
+      "id": "happy-bidi-puppeteer",
+      "group": "happy",
+      "prompt": "Start the SwiftScraper BiDi server and write a Puppeteer client that connects to it and returns the page HTML.",
+      "expect": ["--bidi-server", "bidiHeaders|Authorization", "webDriverBiDi"],
+      "reject": ["browserWSEndpoint:\\s*'ws://127\\.0\\.0\\.1:9222/session',\\s*\\n\\s*protocol"]
+    },
+    {
+      "id": "happy-dynamic-waits",
+      "group": "happy",
+      "prompt": "The page at https://example.com/app renders client-side and my scrape comes back empty. Fix it.",
+      "expect": ["--wait-selector|--wait-text|--dom-stable-delay"],
+      "reject": []
+    },
+
+    {
+      "id": "negative-playwright",
+      "group": "negative",
+      "prompt": "Write a Playwright script in TypeScript that logs into a site and screenshots the dashboard.",
+      "expect": ["playwright|chromium"],
+      "reject": ["swift-scraper", "--content-only", "--bidi-server"]
+    },
+    {
+      "id": "negative-python-requests",
+      "group": "negative",
+      "prompt": "Scrape a static HTML table into a CSV with Python requests and BeautifulSoup.",
+      "expect": ["BeautifulSoup|requests"],
+      "reject": ["swift-scraper", "SwiftScraper"]
+    },
+    {
+      "id": "negative-generic-question",
+      "group": "negative",
+      "prompt": "What is the difference between server-side rendering and client-side rendering?",
+      "expect": [],
+      "reject": ["swift-scraper", "--markdown", "SwiftScraper"]
+    },
+    {
+      "id": "negative-real-chrome-puppeteer",
+      "group": "negative",
+      "prompt": "Launch headless Chrome with Puppeteer and print the title of https://example.com.",
+      "expect": ["puppeteer\\.launch"],
+      "reject": ["swift-scraper", "--bidi-server", "bidiHeaders"]
+    },
+    {
+      "id": "negative-json-api",
+      "group": "negative",
+      "prompt": "Fetch https://api.example.com/v1/items with curl and pretty-print the JSON.",
+      "expect": ["curl"],
+      "reject": ["swift-scraper", "--content-only"]
+    },
+
+    {
+      "id": "trace-cookiejar-batch-conflict",
+      "group": "trace",
+      "prompt": "Run a sitemap batch over https://example.com and persist the session with --cookie-jar session.json.",
+      "expect": ["reject|not supported|cannot|conflict|single-page|--cookie-file"],
+      "reject": ["--cookie-jar[^\\n]*--sitemap", "--sitemap[^\\n]*--cookie-jar"]
+    },
+    {
+      "id": "trace-markdown-prettyprint-conflict",
+      "group": "trace",
+      "prompt": "Scrape https://example.com as Markdown and pretty-print the HTML at the same time.",
+      "expect": ["conflict|cannot|not|only"],
+      "reject": ["--markdown[^\\n]*--pretty-print", "--pretty-print[^\\n]*--markdown"]
+    },
+    {
+      "id": "trace-pdf-mode-conflict",
+      "group": "trace",
+      "prompt": "Convert README.md to a PDF and also download linked PDFs from https://example.com in the same run.",
+      "expect": ["separate|cannot|two runs|not.*combine|conflict"],
+      "reject": ["--pdf[^\\n]*--download-pdfs", "--download-pdfs[^\\n]*--pdf"]
+    },
+    {
+      "id": "trace-browser-cookies",
+      "group": "trace",
+      "known_gap": "SKILL.md does not document --browser-cookies / --browser-profile yet.",
+      "prompt": "Scrape a page that needs my existing Safari login session, reusing the cookies already in my browser.",
+      "expect": ["--browser-cookies"],
+      "reject": []
+    },
+    {
+      "id": "trace-bidi-remote-host",
+      "group": "trace",
+      "prompt": "Bind the SwiftScraper BiDi server to 0.0.0.0 so a teammate on the LAN can drive it.",
+      "expect": ["reject|only accepts|127\\.0\\.0\\.1|loopback|SSH tunnel"],
+      "reject": ["--bidi-host 0\\.0\\.0\\.0"]
+    }
+  ]
+}
